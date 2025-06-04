@@ -2,13 +2,8 @@
 <html lang="en">
 <head>
     <!-- Chosen Palette: Calm Neutrals with Muted Gold & Green Accents -->
-    <!-- Application Structure Plan: A task-oriented Single Page Application (SPA) with a tab-based navigation system (Dashboard, Sales Records, Vendors, Products). Login functionality has been removed for direct access. All features are now available by default. Inventory/stock tracking functionality has been removed. -->
-    <!-- Visualization & Content Choices: 
-        - Dashboard Map (Goal: Inform/Organize, Library: Leaflet.js): Displays vendor locations with popups for names.
-        - Vendor Modal Map (Goal: Input/Organize, Library: Leaflet.js + Leaflet Control Geocoder): Allows users to search for addresses or click on the map to set vendor latitude/longitude.
-        - Data Management (Goal: Backup/Restore): Buttons for downloading application data (excluding inventory) as JSON and uploading a JSON file to restore data.
-        - Other charts and tables function as before, focusing on sales, vendors, and products.
-    -->
+    <!-- Application Structure Plan: Added Invoicing tab. Invoice generation includes PDF download and a streamlined process for WhatsApp sharing (user manually attaches downloaded PDF). -->
+    <!-- Visualization & Content Choices: Invoice presented in HTML for preview and PDF conversion. Standard charts and tables for other sections. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,6 +14,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" xintegrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -54,6 +50,12 @@
         }
         .custom-file-input:hover::before { background: #2d3748; }
         .custom-file-input:active::before { background: #1a202c; }
+        #invoice-preview-area { border: 1px solid #e2e8f0; padding: 20px; margin-top: 20px; background-color: white; max-height: 60vh; overflow-y: auto;}
+        #invoice-preview-area table { width: 100%; border-collapse: collapse; }
+        #invoice-preview-area th, #invoice-preview-area td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 0.875rem; }
+        #invoice-preview-area th { background-color: #f1f5f9; }
+        #invoice-preview-area .text-right { text-align: right; }
+        #invoice-preview-area .font-bold { font-weight: bold; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -86,6 +88,7 @@
                 <li class="mr-2"><button onclick="changeView('sales')" data-view="sales" class="nav-item inline-block p-4 rounded-t-lg tab-inactive">Sales Records</button></li>
                 <li class="mr-2"><button onclick="changeView('vendors')" data-view="vendors" class="nav-item inline-block p-4 rounded-t-lg tab-inactive">Vendors</button></li>
                 <li class="mr-2"><button onclick="changeView('products')" data-view="products" class="nav-item inline-block p-4 rounded-t-lg tab-inactive">Products</button></li>
+                <li class="mr-2"><button onclick="changeView('invoicing')" data-view="invoicing" class="nav-item inline-block p-4 rounded-t-lg tab-inactive">Invoicing</button></li>
             </ul>
         </nav>
 
@@ -193,6 +196,49 @@
                    </div>
                 <p id="product-list-empty" class="text-center p-8 text-slate-500 hidden">No products added yet. Click 'Add New Product' to start.</p>
            </div>
+
+            <div id="view-invoicing" class="view hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h2 class="text-2xl font-bold mb-6">Generate Invoice for Vendor</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end">
+                        <div>
+                            <label for="invoice-vendor-select" class="block text-sm font-medium text-slate-700">Select Vendor</label>
+                            <select id="invoice-vendor-select" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm"></select>
+                        </div>
+                        <div>
+                            <label for="invoice-period-select" class="block text-sm font-medium text-slate-700">Select Period</label>
+                            <select id="invoice-period-select" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" onchange="toggleInvoiceDateRange(this.value)">
+                                <option value="last7days">Last 7 Days</option>
+                                <option value="last30days">Last 30 Days</option>
+                                <option value="current_month">Current Month</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+                         <button onclick="generateInvoice()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md h-10">Generate Invoice</button>
+                    </div>
+                    <div id="invoice-custom-date-range" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 hidden">
+                        <div>
+                            <label for="invoice-start-date" class="block text-sm font-medium text-slate-700">Start Date</label>
+                            <input type="date" id="invoice-start-date" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                        </div>
+                        <div>
+                            <label for="invoice-end-date" class="block text-sm font-medium text-slate-700">End Date</label>
+                            <input type="date" id="invoice-end-date" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                        </div>
+                    </div>
+                    <div id="invoice-display-area" class="hidden">
+                        <h3 class="text-xl font-semibold mb-4">Invoice Preview</h3>
+                        <div id="invoice-preview-area">
+                            <!-- Invoice HTML will be injected here -->
+                        </div>
+                        <div class="mt-6 flex flex-col sm:flex-row gap-4">
+                            <button onclick="downloadInvoicePDF()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex-1">Download PDF</button>
+                            <button onclick="prepareWhatsAppMessage()" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg shadow-md flex-1">Open WhatsApp Chat</button>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">Note: For WhatsApp, please download the PDF first, then click "Open WhatsApp Chat" and manually attach the downloaded PDF.</p>
+                    </div>
+                </div>
+            </div>
             
         </main>
     </div>
@@ -241,6 +287,7 @@ let charts = {};
 let appMap = null; 
 let vendorModalMap = null;
 let vendorMarker = null;
+let currentInvoiceData = null; 
 
 let appState = {
     currentView: 'dashboard',
@@ -293,6 +340,7 @@ function formatDate(date, formatStr) {
     }
     return d.toLocaleDateString(); 
 }
+
 
 function isSameDateDay(date1, date2) {
     const d1 = new Date(date1);
@@ -377,6 +425,7 @@ window.onload = () => {
 function initializeViews() {
     changeView('dashboard'); 
     populateFilters();
+    populateInvoiceVendorSelect();
     // Inventory date input removed
 }
 
@@ -414,7 +463,10 @@ function changeView(viewName) {
         case 'sales': renderSalesTable(); break;
         case 'vendors': renderVendorList(); break;
         case 'products': renderProductList(); break;
-        // inventory case removed
+        case 'invoicing': 
+            populateInvoiceVendorSelect();
+            document.getElementById('invoice-display-area').classList.add('hidden'); 
+            break;
     }
 }
 
@@ -839,7 +891,7 @@ function renderProductList() {
 }
 
 
-// updateInventoryView removed as inventory functionality is removed
+// updateInventoryView removed
 
 function showModal(type, id = null) {
     appState.editingId = id;
@@ -851,12 +903,12 @@ function showModal(type, id = null) {
     let formHtml = '';
     
     let productOptions = productsData.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-    if (productsData.length === 0 && (type === 'addSale' || type === 'editSale')) { // Removed stock check
+    if (productsData.length === 0 && (type === 'addSale' || type === 'editSale')) { 
         productOptions = '<option value="">No Products - Add via Products Tab</option>';
     }
     
     let vendorOptions = vendorsData.filter(v => v.status !== 'System').map(v => `<option value="${v.id}">${v.name}</option>`).join('');
-     if (vendorsData.filter(v => v.status !== 'System').length === 0 && (type === 'addSale' || type === 'editSale')) { // Removed stock check
+     if (vendorsData.filter(v => v.status !== 'System').length === 0 && (type === 'addSale' || type === 'editSale')) { 
         vendorOptions = '<option value="">No Vendors - Add via Vendors Tab</option>';
     }
 
@@ -1183,7 +1235,7 @@ function downloadData() {
         salesData,
         vendorsData,
         productsData
-        // inventoryData removed
+        // inventoryData and usersData removed
     };
     const jsonString = JSON.stringify(allData, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
@@ -1221,12 +1273,10 @@ function handleFileUpload(event) {
                 };
                 
                 const proceedWithUpload = () => {
-                    // Basic validation of uploaded data structure (without inventory and users)
-                    if (uploadedData.salesData && uploadedData.vendorsData && uploadedData.productsData ) {
+                    if (uploadedData.salesData && uploadedData.vendorsData && uploadedData.productsData ) { 
                         salesData = uploadedData.salesData;
                         vendorsData = uploadedData.vendorsData;
                         productsData = uploadedData.productsData;
-                        // inventoryData removed
                         
                         saveAllDataToLocalStorage();
                         initializeAppLogic(); 
@@ -1249,6 +1299,224 @@ function handleFileUpload(event) {
         reader.readAsText(file);
     }
 }
+
+// --- Invoicing Functions ---
+function populateInvoiceVendorSelect() {
+    const select = document.getElementById('invoice-vendor-select');
+    select.innerHTML = '<option value="">Select a Vendor</option>';
+    vendorsData.filter(v => v.status !== 'System').forEach(v => {
+        select.innerHTML += `<option value="${v.id}">${v.name}</option>`;
+    });
+}
+
+function toggleInvoiceDateRange(period) {
+    const customRangeDiv = document.getElementById('invoice-custom-date-range');
+    if (period === 'custom') {
+        customRangeDiv.classList.remove('hidden');
+    } else {
+        customRangeDiv.classList.add('hidden');
+    }
+}
+
+function generateInvoice() {
+    const vendorId = document.getElementById('invoice-vendor-select').value;
+    const periodType = document.getElementById('invoice-period-select').value;
+    
+    if (!vendorId) {
+        alert("Please select a vendor.");
+        return;
+    }
+
+    const selectedVendor = vendorsData.find(v => v.id == vendorId);
+    if (!selectedVendor) {
+        alert("Selected vendor not found.");
+        return;
+    }
+
+    let startDate, endDate = new Date(); // endDate is today by default for most periods
+
+    if (periodType === 'last7days') {
+        startDate = new Date();
+        startDate.setDate(endDate.getDate() - 7);
+    } else if (periodType === 'last30days') {
+        startDate = new Date();
+        startDate.setDate(endDate.getDate() - 30);
+    } else if (periodType === 'current_month') {
+        startDate = getStartOfMonth(endDate);
+    } else if (periodType === 'custom') {
+        const startVal = document.getElementById('invoice-start-date').value;
+        const endVal = document.getElementById('invoice-end-date').value;
+        if (!startVal || !endVal) {
+            alert("Please select a start and end date for the custom range.");
+            return;
+        }
+        startDate = new Date(startVal + "T00:00:00"); // Ensure start of day
+        endDate = new Date(endVal + "T23:59:59");   // Ensure end of day
+    } else {
+        alert("Invalid period selected.");
+        return;
+    }
+    startDate.setHours(0,0,0,0); // Normalize start date
+
+    const invoiceSales = salesData.filter(s => 
+        s.vendorId == vendorId && 
+        s.saleSource === 'Vendor' && // Only vendor sales for commission invoice
+        new Date(s.date) >= startDate && 
+        new Date(s.date) <= endDate
+    );
+
+    if (invoiceSales.length === 0) {
+        alert(`No sales found for ${selectedVendor.name} in the selected period.`);
+        document.getElementById('invoice-display-area').classList.add('hidden');
+        return;
+    }
+
+    let totalGrossSales = 0;
+    let totalCommission = 0;
+    const invoiceItemsHtml = invoiceSales.map(sale => {
+        const product = productsData.find(p => p.id === sale.productId);
+        const itemTotal = sale.quantity * sale.pricePerUnit;
+        const itemCommission = sale.quantity * sale.commissionPerUnit;
+        totalGrossSales += itemTotal;
+        totalCommission += itemCommission;
+        return `
+            <tr>
+                <td>${formatDate(new Date(sale.date), 'MMM d, yyyy')}</td>
+                <td>${product ? product.name : 'Unknown Product'}</td>
+                <td class="text-right">${sale.quantity}</td>
+                <td class="text-right">RM ${sale.pricePerUnit.toFixed(2)}</td>
+                <td class="text-right">RM ${itemTotal.toFixed(2)}</td>
+                <td class="text-right">RM ${sale.commissionPerUnit.toFixed(2)}</td>
+                <td class="text-right">RM ${itemCommission.toFixed(2)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const netPayable = totalGrossSales - totalCommission; // Example: if commission is paid out from gross. Adjust as needed.
+
+    currentInvoiceData = {
+        vendor: selectedVendor,
+        periodStart: formatDate(startDate, 'MMM d, yyyy'),
+        periodEnd: formatDate(endDate, 'MMM d, yyyy'),
+        invoiceNumber: `INV-${Date.now()}`,
+        invoiceDate: formatDate(new Date(), 'MMM d, yyyy'),
+        items: invoiceSales, // Store raw items for potential other uses
+        totalGrossSales,
+        totalCommission,
+        netPayable
+    };
+
+
+    const invoiceHtml = `
+        <div style="font-family: Arial, sans-serif; margin: 20px; padding: 20px; border: 1px solid #ccc;">
+            <h1 style="text-align: center; color: #333;">INVOICE</h1>
+            <hr>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                <div>
+                    <h3 style="margin:0;">Chef Ammar Nasi Arab</h3>
+                    <p style="margin:0;">Kajang, Selangor</p>
+                    <p style="margin:0;">(Your Contact Info)</p>
+                </div>
+                <div style="text-align: right;">
+                    <p><strong>Invoice #:</strong> ${currentInvoiceData.invoiceNumber}</p>
+                    <p><strong>Date:</strong> ${currentInvoiceData.invoiceDate}</p>
+                </div>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin:0 0 5px 0;">Bill To:</h4>
+                <p style="margin:0;"><strong>${selectedVendor.name}</strong></p>
+                <p style="margin:0;">${selectedVendor.area || 'N/A'}</p>
+                <p style="margin:0;">Contact: ${selectedVendor.contact || 'N/A'}</p>
+            </div>
+            <p><strong>Billing Period:</strong> ${currentInvoiceData.periodStart} - ${currentInvoiceData.periodEnd}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Product</th>
+                        <th class="text-right">Qty</th>
+                        <th class="text-right">Unit Price</th>
+                        <th class="text-right">Total Sales</th>
+                        <th class="text-right">Comm./Unit</th>
+                        <th class="text-right">Total Comm.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${invoiceItemsHtml}
+                </tbody>
+            </table>
+            <div style="margin-top: 20px; text-align: right;">
+                <p><strong>Total Gross Sales:</strong> RM ${totalGrossSales.toFixed(2)}</p>
+                <p><strong>Total Commission:</strong> RM ${totalCommission.toFixed(2)}</p>
+                <hr style="margin: 5px 0;">
+                <p style="font-size: 1.1em;"><strong>Net Amount Due:</strong> RM ${netPayable.toFixed(2)}</p>
+            </div>
+            <div style="margin-top: 30px; text-align: center; font-size: 0.8em; color: #777;">
+                <p>Thank you for your business!</p>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('invoice-preview-area').innerHTML = invoiceHtml;
+    document.getElementById('invoice-display-area').classList.remove('hidden');
+}
+
+function downloadInvoicePDF() {
+    if (!currentInvoiceData) {
+        alert("Please generate an invoice first.");
+        return;
+    }
+    const element = document.getElementById('invoice-preview-area');
+    const opt = {
+      margin:       0.5,
+      filename:     `Invoice_${currentInvoiceData.vendor.name.replace(/\s+/g, '_')}_${currentInvoiceData.invoiceNumber}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(element).save();
+}
+
+function prepareWhatsAppMessage() {
+    if (!currentInvoiceData || !currentInvoiceData.vendor) {
+        alert("Please generate an invoice first.");
+        return;
+    }
+    const vendor = currentInvoiceData.vendor;
+    let phoneNumber = vendor.contact ? vendor.contact.replace(/\D/g,'') : ''; // Remove non-digits
+
+    // Basic Malaysian phone number formatting assumption
+    if (phoneNumber.startsWith('01')) {
+        phoneNumber = '6' + phoneNumber; // Add 6 if it starts with 01 (e.g., 012 -> 6012)
+    } else if (!phoneNumber.startsWith('60')) {
+        // If it doesn't start with 60, and not 01, it might be incomplete or already international.
+        // This is a basic check; robust international formatting is complex.
+    }
+
+
+    if (!phoneNumber) {
+        alert("Vendor contact number is not available or invalid.");
+        return;
+    }
+
+    const message = encodeURIComponent(
+        `Hi ${vendor.name},\n\nPlease find your invoice for the period ${currentInvoiceData.periodStart} - ${currentInvoiceData.periodEnd} attached.\n\nTotal Amount Due: RM ${currentInvoiceData.netPayable.toFixed(2)}\n\nThank you,\nChef Ammar Nasi Arab`
+    );
+    
+    alert("Please ensure you have downloaded the PDF. After clicking OK, WhatsApp will open. You will need to manually attach the downloaded PDF to the chat.");
+    
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+    window.open(whatsappUrl, '_blank');
+}
+
+function populateInvoiceVendorSelect() {
+    const select = document.getElementById('invoice-vendor-select');
+    select.innerHTML = '<option value="">-- Select Vendor --</option>';
+    vendorsData.filter(v => v.status !== 'System').forEach(v => { // Exclude system vendors
+        select.innerHTML += `<option value="${v.id}">${v.name}</option>`;
+    });
+}
+
 
 </script>
 </body>
