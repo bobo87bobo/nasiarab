@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Chosen Palette: Calm Neutrals with Muted Gold & Green Accents -->
+    <!-- Application Structure Plan: A task-oriented Single Page Application (SPA) with a tab-based navigation system. Added a map to the Dashboard for vendor visualization. Vendor data now includes latitude/longitude for map plotting. Vendor modal now includes an interactive map with search and point-to-select for location input. -->
+    <!-- Visualization & Content Choices: 
+        - Dashboard Map (Goal: Inform/Organize, Library: Leaflet.js): Displays vendor locations with popups for names.
+        - Vendor Modal Map (Goal: Input/Organize, Library: Leaflet.js + Leaflet Control Geocoder): Allows users to search for addresses or click on the map to set vendor latitude/longitude.
+        - Other elements remain similar, focusing on their respective goals.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chef Ammar Nasi Arab - Sales System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .chart-container { position: relative; width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; height: 300px; max-height: 400px; }
+        #map-container { height: 400px; width: 100%; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+        #vendor-modal-map-container { height: 300px; width: 100%; margin-top: 1rem; border-radius: 0.5rem; }
+        @media (min-width: 768px) { .chart-container { height: 350px; } #map-container { height: 500px; } }
+        .tab-active { border-bottom: 2px solid #ca8a04; color: #ca8a04; font-weight: 600; }
+        .tab-inactive { color: #737373; }
+        .modal { transition: opacity 0.25s ease; }
+        .modal-content { transition: transform 0.25s ease; }
+        input:focus, select:focus, textarea:focus { border-color: #ca8a04 !important; outline: 1px solid #ca8a04; }
+        #critical-error-message-container { padding: 20px; text-align: center; font-family: sans-serif; color: red; background-color: #fff0f0; border: 1px solid red; margin: 10px; }
+        .leaflet-control-geocoder-form input { width: 100% !important; } /* Ensure geocoder input is full width */
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="critical-error-message-container" class="hidden"></div>
+    <div id="app-container" class="max-w-7xl mx-auto p-4 md:p-6">
+
+        <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-900">Nasi Arab Sales System</h1>
+                <p class="text-slate-500">Welcome, Chef Ammar!</p>
+            </div>
+            <button onclick="showModal('addSale')" class="mt-4 sm:mt-0 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                Add New Sale
+            </button>
+        </header>
+
+        <nav class="mb-6 border-b border-slate-200">
+            <ul class="flex flex-wrap -mb-px">
+                <li class="mr-2"><button onclick="changeView('dashboard')" data-view="dashboard" class="inline-block p-4 rounded-t-lg tab-active">Dashboard</button></li>
+                <li class="mr-2"><button onclick="changeView('sales')" data-view="sales" class="inline-block p-4 rounded-t-lg tab-inactive">Sales Records</button></li>
+                <li class="mr-2"><button onclick="changeView('vendors')" data-view="vendors" class="inline-block p-4 rounded-t-lg tab-inactive">Vendors</button></li>
+                <li class="mr-2"><button onclick="changeView('products')" data-view="products" class="inline-block p-4 rounded-t-lg tab-inactive">Products</button></li>
+                <li class="mr-2"><button onclick="changeView('inventory')" data-view="inventory" class="inline-block p-4 rounded-t-lg tab-inactive">Inventory</button></li>
+            </ul>
+        </nav>
+
+        <main>
+            <div id="view-dashboard" class="view">
+                <div class="mb-6 p-4 bg-white rounded-lg shadow">
+                    <h3 class="text-lg font-semibold mb-2">Dashboard Filters</h3>
+                    <select id="dashboard-period" onchange="updateDashboard()" class="w-full md:w-1/3 p-2 border border-slate-300 rounded-md">
+                        <option value="today">Today</option>
+                        <option value="this_week">This Week</option>
+                        <option value="this_month" selected>This Month</option>
+                        <option value="all_time">All Time</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+                    <div class="bg-white p-5 rounded-lg shadow"><h4 class="text-slate-500">Total Revenue</h4><p id="metric-revenue" class="text-3xl font-bold">RM 0</p></div>
+                    <div class="bg-white p-5 rounded-lg shadow"><h4 class="text-slate-500">Total Commissions</h4><p id="metric-commission" class="text-3xl font-bold">RM 0</p></div>
+                    <div class="bg-white p-5 rounded-lg shadow"><h4 class="text-slate-500">Net Profit</h4><p id="metric-profit" class="text-3xl font-bold">RM 0</p></div>
+                    <div class="bg-white p-5 rounded-lg shadow"><h4 class="text-slate-500">Total Orders</h4><p id="metric-orders" class="text-3xl font-bold">0</p></div>
+                </div>
+
+                <div class="mb-6 bg-white p-5 rounded-lg shadow">
+                    <h3 class="font-semibold mb-4 text-center text-xl">Vendor Locations</h3>
+                    <div id="map-container"></div>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                    <div class="bg-white p-5 rounded-lg shadow">
+                        <h3 class="font-semibold mb-4 text-center">Sales Trend</h3>
+                        <div class="chart-container"><canvas id="salesTrendChart"></canvas></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-lg shadow">
+                        <h3 class="font-semibold mb-4 text-center">Best Selling Products</h3>
+                        <div class="chart-container"><canvas id="bestSellersChart"></canvas></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-lg shadow">
+                        <h3 class="font-semibold mb-4 text-center">Top Performing Vendors</h3>
+                        <div class="chart-container"><canvas id="topVendorsChart"></canvas></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-lg shadow">
+                        <h3 class="font-semibold mb-4 text-center">Sales by Platform</h3>
+                        <div class="chart-container"><canvas id="salesPlatformChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-sales" class="view hidden">
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+                        <input type="text" id="sales-search" onkeyup="renderSalesTable()" placeholder="Search..." class="p-2 border border-slate-300 rounded-md">
+                        <select id="sales-source-filter" onchange="renderSalesTable()" class="p-2 border border-slate-300 rounded-md">
+                            <option value="">All Sources</option>
+                            <option value="Vendor">Vendor</option>
+                            <option value="Restaurant">Restaurant</option>
+                            <option value="Event">Event</option>
+                        </select>
+                        <select id="sales-vendor-filter" onchange="renderSalesTable()" class="p-2 border border-slate-300 rounded-md"></select>
+                        <select id="sales-platform-filter" onchange="renderSalesTable()" class="p-2 border border-slate-300 rounded-md"></select>
+                        <input type="date" id="sales-date-filter" onchange="renderSalesTable()" class="p-2 border border-slate-300 rounded-md">
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-100">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">Date</th>
+                                    <th scope="col" class="px-6 py-3">Source</th>
+                                    <th scope="col" class="px-6 py-3">Vendor/Event</th>
+                                    <th scope="col" class="px-6 py-3">Product</th>
+                                    <th scope="col" class="px-6 py-3">Qty</th>
+                                    <th scope="col" class="px-6 py-3">Total</th>
+                                    <th scope="col" class="px-6 py-3">Platform</th>
+                                    <th scope="col" class="px-6 py-3">Customer</th>
+                                    <th scope="col" class="px-6 py-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sales-table-body">
+                                </tbody>
+                        </table>
+                         <p id="sales-table-empty" class="text-center p-8 text-slate-500 hidden">No sales records match the current filters.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-vendors" class="view hidden">
+                 <div class="flex justify-end mb-4">
+                    <button onclick="showModal('addVendor')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                        Add New Vendor
+                    </button>
+                </div>
+                <div id="vendor-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    </div>
+                 <p id="vendor-list-empty" class="text-center p-8 text-slate-500 hidden">No vendors added yet. Click 'Add New Vendor' to start.</p>
+            </div>
+
+            <div id="view-products" class="view hidden">
+                <div class="flex justify-end mb-4">
+                   <button onclick="showModal('addProduct')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center">
+                       <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                       Add New Product
+                   </button>
+               </div>
+               <div id="product-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                   </div>
+                <p id="product-list-empty" class="text-center p-8 text-slate-500 hidden">No products added yet. Click 'Add New Product' to start.</p>
+           </div>
+            
+            <div id="view-inventory" class="view hidden">
+                 <div class="bg-white p-6 rounded-lg shadow">
+                    <h2 class="text-2xl font-bold mb-4">Inventory Reconciliation</h2>
+                    <p class="text-slate-600 mb-6">Use this section to compare stock sent to vendors against their reported sales for any given day. This helps identify discrepancies quickly.</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end">
+                        <div>
+                            <label for="inventory-date" class="block text-sm font-medium text-slate-700">Date</label>
+                            <input type="date" id="inventory-date" onchange="updateInventoryView()" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2">
+                        </div>
+                        <div>
+                            <label for="inventory-vendor" class="block text-sm font-medium text-slate-700">Vendor</label>
+                            <select id="inventory-vendor" onchange="updateInventoryView()" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></select>
+                        </div>
+                        <button onclick="updateInventoryView()" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow-md h-10">Check Inventory</button>
+                    </div>
+
+                    <div id="inventory-results" class="hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                            <div class="bg-blue-100 p-4 rounded-lg">
+                                <h4 class="font-semibold text-blue-800">Stock Sent</h4>
+                                <p id="inv-sent" class="text-2xl font-bold text-blue-900">0</p>
+                                <button onclick="showModal('addStockOut')" class="text-sm text-blue-600 hover:underline mt-1">Log Stock Out</button>
+                            </div>
+                            <div class="bg-red-100 p-4 rounded-lg">
+                                <h4 class="font-semibold text-red-800">Stock Returned</h4>
+                                <p id="inv-returned" class="text-2xl font-bold text-red-900">0</p>
+                                <button onclick="showModal('addStockIn')" class="text-sm text-red-600 hover:underline mt-1">Log Stock In</button>
+                            </div>
+                             <div class="bg-green-100 p-4 rounded-lg">
+                                <h4 class="font-semibold text-green-800">Reported Sales</h4>
+                                <p id="inv-sold" class="text-2xl font-bold text-green-900">0</p>
+                                <p class="text-xs text-slate-500">(from Sales Records)</p>
+                            </div>
+                        </div>
+                         <div class="mt-6 p-4 rounded-lg" id="inventory-summary">
+                            </div>
+                    </div>
+                 </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div id="modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden opacity-0">
+        <div class="modal-content bg-white w-full max-w-lg rounded-lg shadow-xl overflow-y-auto max-h-[90vh] transform scale-95">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="modal-title" class="text-2xl font-bold">Modal Title</h3>
+                    <button onclick="hideModal()" class="text-slate-400 hover:text-slate-600">&times;</button>
+                </div>
+                <form id="modal-form" onsubmit="handleFormSubmit(event)">
+                    </form>
+            </div>
+        </div>
+    </div>
+    
+    <div id="confirm-dialog" class="modal fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 hidden opacity-0">
+        <div class="bg-white w-full max-w-sm rounded-lg shadow-xl p-6 text-center">
+            <h3 id="confirm-title" class="text-lg font-bold mb-2">Are you sure?</h3>
+            <p id="confirm-message" class="text-slate-600 mb-6">This action cannot be undone.</p>
+            <div class="flex justify-center gap-4">
+                <button id="confirm-btn-cancel" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg">Cancel</button>
+                <button id="confirm-btn-ok" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+
+<script>
+let salesData = [];
+let vendorsData = [];
+let productsData = []; 
+let inventoryData = [];
+
+let charts = {};
+let appMap = null; 
+let vendorModalMap = null;
+let vendorMarker = null;
+
+let appState = {
+    currentView: 'dashboard',
+    editingId: null,
+    editingType: null,
+};
+
+// --- Native Date Helper Functions ---
+function getStartOfToday() {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now;
+}
+
+function getStartOfWeek(date, options = { weekStartsOn: 1 }) { 
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = (day < options.weekStartsOn ? 7 : 0) + day - options.weekStartsOn;
+    d.setDate(d.getDate() - diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function getStartOfMonth(date) {
+    const d = new Date(date);
+    d.setDate(1);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function formatDate(date, formatStr) {
+    const d = new Date(date);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    if (formatStr === 'MMM d, yyyy') { 
+        return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    }
+    if (formatStr === 'E, MMM d') {
+        return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+    }
+    if (formatStr === 'MMM d') {
+         return `${months[d.getMonth()]} ${d.getDate()}`;
+    }
+    return d.toLocaleDateString(); 
+}
+
+function isSameDateDay(date1, date2) {
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
+    return d1.getFullYear() === d2.getFullYear() &&
+           d1.getMonth() === d2.getMonth() &&
+           d1.getDate() === d2.getDate();
+}
+
+
+// --- LocalStorage Functions ---
+function saveAllDataToLocalStorage() {
+    localStorage.setItem('nasiArabSalesData', JSON.stringify(salesData));
+    localStorage.setItem('nasiArabVendorsData', JSON.stringify(vendorsData));
+    localStorage.setItem('nasiArabProductsData', JSON.stringify(productsData));
+    localStorage.setItem('nasiArabInventoryData', JSON.stringify(inventoryData));
+    console.log("Data saved to localStorage");
+}
+
+function loadDataFromLocalStorage() {
+    const sales = localStorage.getItem('nasiArabSalesData');
+    const vendors = localStorage.getItem('nasiArabVendorsData');
+    const products = localStorage.getItem('nasiArabProductsData');
+    const inventory = localStorage.getItem('nasiArabInventoryData');
+
+    let loadedSuccessfully = true;
+
+    if (sales) try { salesData = JSON.parse(sales); } catch (e) { console.error("Error parsing salesData:", e); loadedSuccessfully = false; salesData = []; }
+    else { loadedSuccessfully = false; salesData = []; }
+
+    if (vendors) try { vendorsData = JSON.parse(vendors); } catch (e) { console.error("Error parsing vendorsData:", e); loadedSuccessfully = false; vendorsData = []; }
+    else { loadedSuccessfully = false; vendorsData = []; }
+    
+    if (products) try { productsData = JSON.parse(products); } catch (e) { console.error("Error parsing productsData:", e); loadedSuccessfully = false; productsData = []; }
+    else { loadedSuccessfully = false; productsData = []; }
+
+    if (inventory) try { inventoryData = JSON.parse(inventory); } catch (e) { console.error("Error parsing inventoryData:", e); loadedSuccessfully = false; inventoryData = []; }
+    else { loadedSuccessfully = false; inventoryData = []; }
+    
+    if (loadedSuccessfully && sales && vendors && products && inventory) {
+        console.log("All data loaded from localStorage");
+        return true;
+    }
+    console.log("Some or all data not found/loaded from localStorage. Will initialize as empty or with defaults.");
+    return false; 
+}
+
+
+function generateAndEnsureDefaultData() {
+    if (!Array.isArray(productsData)) productsData = [];
+    if (!Array.isArray(vendorsData)) vendorsData = [];
+    if (!Array.isArray(salesData)) salesData = [];
+    if (!Array.isArray(inventoryData)) inventoryData = [];
+
+    if (vendorsData.length === 0 || !vendorsData.some(v => v.name === 'Restaurant Direct' && v.status === 'System')) {
+         vendorsData.push(
+            { id: Date.now() + 1000, name: 'Restaurant Direct', contact: 'N/A', area: 'Restaurant/Event', commissionRate: 0.00, closureDay: 'None', paymentMethod: 'Internal', status: 'System', latitude: null, longitude: null }
+        );
+    }
+    console.log("Data arrays ensured/initialized.");
+}
+
+function initializeAppLogic() {
+    if (!loadDataFromLocalStorage()) { 
+        generateAndEnsureDefaultData();        
+        saveAllDataToLocalStorage(); 
+    } else {
+        if (!vendorsData.some(v => v.name === 'Restaurant Direct' && v.status === 'System')) {
+            vendorsData.push(
+                 { id: Date.now() + 1000, name: 'Restaurant Direct', contact: 'N/A', area: 'Restaurant/Event', commissionRate: 0.00, closureDay: 'None', paymentMethod: 'Internal', status: 'System', latitude: null, longitude: null }
+            );
+            saveAllDataToLocalStorage(); 
+        }
+    }
+    initializeViews();
+    attachEventListeners();
+}
+
+window.onload = () => {
+    initializeAppLogic();
+};
+
+
+function initializeViews() {
+    changeView('dashboard');
+    populateFilters();
+    const today = new Date();
+    const isoDate = today.toISOString().split('T')[0];
+    document.getElementById('inventory-date').value = isoDate;
+}
+
+function attachEventListeners() {
+    document.getElementById('modal').addEventListener('click', (e) => {
+        if (e.target.id === 'modal') hideModal();
+    });
+     document.getElementById('modal-form').addEventListener('change', (event) => {
+        if (event.target.id === 'saleSourceSelector') {
+            toggleSaleFormFields(event.target.value);
+        }
+    });
+}
+
+function changeView(viewName) {
+    appState.currentView = viewName;
+    document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+    document.getElementById(`view-${viewName}`).classList.remove('hidden');
+
+    document.querySelectorAll('nav button').forEach(b => {
+        if (b.dataset.view === viewName) {
+            b.classList.remove('tab-inactive');
+            b.classList.add('tab-active');
+        } else {
+            b.classList.remove('tab-active');
+            b.classList.add('tab-inactive');
+        }
+    });
+
+    switch (viewName) {
+        case 'dashboard': 
+            updateDashboard(); 
+            setTimeout(initializeDashboardMap, 0); 
+            break;
+        case 'sales': renderSalesTable(); break;
+        case 'vendors': renderVendorList(); break;
+        case 'products': renderProductList(); break;
+        case 'inventory': updateInventoryView(); break;
+    }
+}
+
+function initializeDashboardMap() {
+    if (appMap) { 
+        appMap.invalidateSize(); 
+        appMap.eachLayer(layer => {
+            if (layer instanceof L.Marker) {
+                appMap.removeLayer(layer);
+            }
+        });
+    } else { 
+        appMap = L.map('map-container').setView([2.9935, 101.7874], 12); 
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(appMap);
+    }
+
+    vendorsData.forEach(vendor => {
+        if (vendor.status !== 'System' && vendor.latitude && vendor.longitude) {
+            try {
+                const lat = parseFloat(vendor.latitude);
+                const lon = parseFloat(vendor.longitude);
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    L.marker([lat, lon]).addTo(appMap)
+                        .bindPopup(`<b>${vendor.name}</b><br>${vendor.area || 'N/A'}`);
+                }
+            } catch (e) {
+                console.error("Error parsing lat/lon for dashboard map vendor:", vendor.name, e);
+            }
+        }
+    });
+}
+
+function initializeVendorModalMap(lat, lon) {
+    const mapContainerId = 'vendor-modal-map-container';
+    const mapContainer = document.getElementById(mapContainerId);
+    if (!mapContainer) {
+        console.error("Vendor modal map container not found!");
+        return;
+    }
+    
+    if (vendorModalMap) {
+        vendorModalMap.remove();
+        vendorModalMap = null;
+        vendorMarker = null; // Reset marker as well
+    }
+
+    const initialLat = lat || 2.9935; 
+    const initialLon = lon || 101.7874;
+    const initialZoom = (lat && lon) ? 15 : 11;
+
+    vendorModalMap = L.map(mapContainerId).setView([initialLat, initialLon], initialZoom);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(vendorModalMap);
+
+    L.Control.geocoder({
+        defaultMarkGeocode: false,
+        placeholder: 'Search or click map...'
+    }).on('markgeocode', function(e) {
+        const latlng = e.geocode.center;
+        vendorModalMap.setView(latlng, 15);
+        updateVendorMarker(latlng);
+        document.getElementById('vendorLatitude').value = latlng.lat.toFixed(6);
+        document.getElementById('vendorLongitude').value = latlng.lng.toFixed(6);
+    }).addTo(vendorModalMap);
+
+
+    if (lat && lon && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lon))) {
+        updateVendorMarker({lat: parseFloat(lat), lng: parseFloat(lon)});
+    }
+
+    vendorModalMap.on('click', function(e) {
+        updateVendorMarker(e.latlng);
+        document.getElementById('vendorLatitude').value = e.latlng.lat.toFixed(6);
+        document.getElementById('vendorLongitude').value = e.latlng.lng.toFixed(6);
+    });
+     // Invalidate size after a short delay to ensure the map container is fully rendered in the modal
+    setTimeout(() => {
+        if (vendorModalMap) {
+            vendorModalMap.invalidateSize();
+        }
+    }, 200);
+}
+
+function updateVendorMarker(latlng) {
+    if (vendorMarker) {
+        vendorMarker.setLatLng(latlng);
+    } else {
+        vendorMarker = L.marker(latlng).addTo(vendorModalMap);
+    }
+}
+
+
+function populateFilters() {
+    const vendorFilter = document.getElementById('sales-vendor-filter');
+    const platformFilter = document.getElementById('sales-platform-filter');
+    const inventoryVendorFilter = document.getElementById('inventory-vendor');
+    
+    vendorFilter.innerHTML = '<option value="">All Vendors (for Vendor Sales)</option>';
+    inventoryVendorFilter.innerHTML = ''; 
+    vendorsData.forEach(v => {
+        if (v.status !== 'System') {
+            const optionHTML = `<option value="${v.id}">${v.name}</option>`;
+            vendorFilter.innerHTML += optionHTML;
+            inventoryVendorFilter.innerHTML += optionHTML;
+        }
+    });
+     if (vendorsData.filter(v => v.status !== 'System').length === 0) {
+        vendorFilter.innerHTML = '<option value="">No Vendors Added</option>';
+        inventoryVendorFilter.innerHTML = '<option value="">No Vendors Added</option>';
+    }
+
+
+    platformFilter.innerHTML = '<option value="">All Platforms</option>';
+    if (salesData && salesData.length > 0) {
+        const platforms = [...new Set(salesData.map(s => s.salesPlatform))].sort();
+        platforms.forEach(p => platformFilter.innerHTML += `<option value="${p}">${p}</option>`);
+    } else {
+        platformFilter.innerHTML = '<option value="">No Platforms Yet</option>';
+    }
+}
+
+function getFilteredDashboardData() {
+    const period = document.getElementById('dashboard-period').value;
+    const now = new Date();
+    let startDate;
+
+    switch(period) {
+        case 'today':
+            startDate = getStartOfToday();
+            break;
+        case 'this_week':
+            startDate = getStartOfWeek(now);
+            break;
+        case 'this_month':
+            startDate = getStartOfMonth(now);
+            break;
+        case 'all_time':
+        default:
+            return salesData;
+    }
+    
+    return salesData.filter(s => new Date(s.date) >= startDate);
+}
+
+function updateDashboard() {
+    const data = getFilteredDashboardData();
+
+    const totalRevenue = data.reduce((sum, s) => sum + (s.quantity * s.pricePerUnit), 0);
+    const totalCommission = data.filter(s => s.saleSource === 'Vendor').reduce((sum, s) => sum + (s.quantity * s.commissionPerUnit), 0);
+    const totalOrders = data.length;
+
+    document.getElementById('metric-revenue').textContent = `RM ${totalRevenue.toFixed(2)}`;
+    document.getElementById('metric-commission').textContent = `RM ${totalCommission.toFixed(2)}`;
+    document.getElementById('metric-profit').textContent = `RM ${(totalRevenue - totalCommission).toFixed(2)}`;
+    document.getElementById('metric-orders').textContent = totalOrders;
+
+    renderDashboardCharts(data);
+}
+
+function renderDashboardCharts(data) {
+    renderSalesTrendChart(data);
+    renderBestSellersChart(data);
+    renderTopVendorsChart(data.filter(s => s.saleSource === 'Vendor')); 
+    renderSalesPlatformChart(data);
+}
+
+function destroyChart(chartId) {
+    if (charts[chartId]) {
+        charts[chartId].destroy();
+    }
+}
+
+function renderSalesTrendChart(data) {
+    destroyChart('salesTrendChart');
+    const period = document.getElementById('dashboard-period').value;
+    let trendData = {}; 
+
+    if (period === 'this_month' || period === 'all_time') {
+        trendData = data.reduce((acc, s) => {
+            const weekStartDate = getStartOfWeek(new Date(s.date));
+            const week = formatDate(weekStartDate, 'MMM d');
+            if (!acc[week]) acc[week] = 0;
+            acc[week] += s.quantity * s.pricePerUnit;
+            return acc;
+        }, {});
+    } else { 
+        trendData = data.reduce((acc, s) => {
+            const day = formatDate(new Date(s.date), 'E, MMM d');
+            if (!acc[day]) acc[day] = 0;
+            acc[day] += s.quantity * s.pricePerUnit;
+            return acc;
+        }, {});
+    }
+
+    const ctx = document.getElementById('salesTrendChart').getContext('2d');
+    charts['salesTrendChart'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Object.keys(trendData),
+            datasets: [{
+                label: 'Sales Revenue',
+                data: Object.values(trendData),
+                borderColor: '#ca8a04',
+                backgroundColor: 'rgba(202, 138, 4, 0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+}
+
+function renderBestSellersChart(data) {
+    destroyChart('bestSellersChart');
+    const productSales = data.reduce((acc, s) => {
+        const product = productsData.find(p => p.id === s.productId);
+        const productName = product ? product.name : 'Unknown Product';
+        if (!acc[productName]) acc[productName] = 0;
+        acc[productName] += s.quantity;
+        return acc;
+    }, {});
+    const ctx = document.getElementById('bestSellersChart').getContext('2d');
+    charts['bestSellersChart'] = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(productSales),
+            datasets: [{
+                data: Object.values(productSales),
+                backgroundColor: ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'],
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+}
+
+function renderTopVendorsChart(vendorSalesData) { 
+    destroyChart('topVendorsChart');
+    const vendorSales = vendorSalesData.reduce((acc, s) => {
+        const vendor = vendorsData.find(v => v.id === s.vendorId);
+        const vendorName = vendor ? vendor.name : 'Unknown Vendor';
+        if (!acc[vendorName]) acc[vendorName] = 0;
+        acc[vendorName] += s.quantity * s.pricePerUnit;
+        return acc;
+    }, {});
+
+    const sortedVendors = Object.entries(vendorSales).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const ctx = document.getElementById('topVendorsChart').getContext('2d');
+    charts['topVendorsChart'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: sortedVendors.map(v => v[0]),
+            datasets: [{
+                label: 'Sales by Vendor',
+                data: sortedVendors.map(v => v[1]),
+                backgroundColor: '#10b981'
+            }]
+        },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    });
+}
+
+function renderSalesPlatformChart(data) {
+    destroyChart('salesPlatformChart');
+    const platformSales = data.reduce((acc, s) => {
+        if (!acc[s.salesPlatform]) acc[s.salesPlatform] = 0;
+        acc[s.salesPlatform] += s.quantity * s.pricePerUnit;
+        return acc;
+    }, {});
+
+    const ctx = document.getElementById('salesPlatformChart').getContext('2d');
+    charts['salesPlatformChart'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(platformSales),
+            datasets: [{
+                label: 'Sales by Platform',
+                data: Object.values(platformSales),
+                backgroundColor: '#3b82f6'
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    });
+}
+
+function renderSalesTable() {
+    const searchTerm = document.getElementById('sales-search').value.toLowerCase();
+    const sourceFilter = document.getElementById('sales-source-filter').value;
+    const vendorFilter = document.getElementById('sales-vendor-filter').value;
+    const platformFilter = document.getElementById('sales-platform-filter').value;
+    const dateFilter = document.getElementById('sales-date-filter').value;
+
+    const filteredData = salesData.filter(s => {
+        const vendor = vendorsData.find(v => v.id === s.vendorId);
+        const product = productsData.find(p => p.id === s.productId);
+        
+        const searchMatch = !searchTerm || 
+                            (s.customerName && s.customerName.toLowerCase().includes(searchTerm)) || 
+                            (s.notes && s.notes.toLowerCase().includes(searchTerm)) ||
+                            (s.saleSource === 'Event' && s.eventNameLocation && s.eventNameLocation.toLowerCase().includes(searchTerm)) ||
+                            (vendor && vendor.name.toLowerCase().includes(searchTerm)) ||
+                            (product && product.name.toLowerCase().includes(searchTerm));
+
+        const sourceMatch = !sourceFilter || s.saleSource === sourceFilter;
+        let vendorMatchForTable = true;
+        if (sourceFilter === 'Vendor') { 
+            vendorMatchForTable = !vendorFilter || s.vendorId == vendorFilter;
+        } else if (vendorFilter && sourceFilter !== 'Vendor' && sourceFilter !== '') { 
+             vendorMatchForTable = false; 
+        }
+
+
+        const platformMatch = !platformFilter || s.salesPlatform === platformFilter;
+        const dateMatch = !dateFilter || isSameDateDay(new Date(s.date), new Date(dateFilter + "T00:00:00")); 
+
+        return searchMatch && sourceMatch && vendorMatchForTable && platformMatch && dateMatch;
+    }).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const tableBody = document.getElementById('sales-table-body');
+    const emptyMsg = document.getElementById('sales-table-empty');
+    if(filteredData.length === 0) {
+        tableBody.innerHTML = '';
+        emptyMsg.classList.remove('hidden');
+        return;
+    }
+    emptyMsg.classList.add('hidden');
+
+    tableBody.innerHTML = filteredData.map(s => {
+        const vendor = vendorsData.find(v => v.id === s.vendorId);
+        const product = productsData.find(p => p.id === s.productId);
+        const total = s.quantity * s.pricePerUnit;
+        let vendorOrEventDisplay = vendor ? vendor.name : 'N/A';
+        if (s.saleSource === 'Event') {
+            vendorOrEventDisplay = s.eventNameLocation || 'Event';
+             if (s.eventDate) vendorOrEventDisplay += ` (${formatDate(new Date(s.eventDate  + "T00:00:00"), 'MMM d, yyyy')})`;
+        } else if (s.saleSource === 'Restaurant') {
+            vendorOrEventDisplay = 'Restaurant';
+        }
+
+
+        return `
+            <tr class="bg-white border-b hover:bg-slate-50">
+                <td class="px-6 py-4">${formatDate(new Date(s.date), 'MMM d, yyyy')}</td>
+                <td class="px-6 py-4">${s.saleSource}</td>
+                <td class="px-6 py-4">${vendorOrEventDisplay}</td>
+                <td class="px-6 py-4">${product ? product.name : 'Unknown'}</td>
+                <td class="px-6 py-4">${s.quantity}</td>
+                <td class="px-6 py-4 font-semibold">RM ${total.toFixed(2)}</td>
+                <td class="px-6 py-4">${s.salesPlatform}</td>
+                <td class="px-6 py-4">${s.customerName}</td>
+                <td class="px-6 py-4">
+                    <button onclick="showModal('editSale', ${s.id})" class="text-blue-600 hover:underline">Edit</button>
+                    <button onclick="deleteItem('sale', ${s.id})" class="text-red-600 hover:underline ml-2">Delete</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function renderVendorList() {
+    const listContainer = document.getElementById('vendor-list');
+    const emptyMsg = document.getElementById('vendor-list-empty');
+    const actualVendors = vendorsData.filter(v => v.status !== 'System');
+    
+    listContainer.innerHTML = ''; 
+
+    if (actualVendors.length === 0) {
+        emptyMsg.classList.remove('hidden');
+        return;
+    }
+    emptyMsg.classList.add('hidden');
+
+    actualVendors.forEach(v => {
+     listContainer.innerHTML += `
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h3 class="text-xl font-bold">${v.name}</h3>
+                    <p class="text-sm text-slate-500">${v.area}</p>
+                </div>
+                <span class="text-xs font-semibold px-2 py-1 rounded-full ${v.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${v.status}</span>
+            </div>
+            <div class="mt-4 space-y-2 text-sm">
+                <p><strong>Contact:</strong> ${v.contact || 'N/A'}</p>
+                <p><strong>Commission:</strong> RM ${v.commissionRate.toFixed(2)} / unit</p>
+                <p><strong>Closure Day:</strong> ${v.closureDay || 'N/A'}</p>
+                <p><strong>Payment:</strong> ${v.paymentMethod || 'N/A'}</p>
+                ${v.latitude && v.longitude ? `<p><strong>Location:</strong> ${parseFloat(v.latitude).toFixed(4)}, ${parseFloat(v.longitude).toFixed(4)}</p>` : '<p><strong>Location:</strong> Not Set</p>'}
+            </div>
+            <div class="mt-6 text-right">
+                <button onclick="showModal('editVendor', ${v.id})" class="text-blue-600 hover:underline">Edit</button>
+                <button onclick="deleteItem('vendor', ${v.id})" class="text-red-600 hover:underline ml-4">Delete</button>
+            </div>
+        </div>
+    `;
+    });
+}
+
+function renderProductList() {
+    const listContainer = document.getElementById('product-list');
+    const emptyMsg = document.getElementById('product-list-empty');
+    listContainer.innerHTML = ''; 
+
+    if (productsData.length === 0) {
+        emptyMsg.classList.remove('hidden');
+        return;
+    }
+    emptyMsg.classList.add('hidden');
+
+    productsData.forEach(p => {
+        listContainer.innerHTML += `
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="text-xl font-bold">${p.name}</h3>
+                <p class="text-lg text-yellow-700 font-semibold">RM ${p.price.toFixed(2)}</p>
+                <div class="mt-4 text-right">
+                     <button onclick="showModal('editProduct', ${p.id})" class="text-blue-600 hover:underline">Edit</button>
+                     <button onclick="deleteItem('product', ${p.id})" class="text-red-600 hover:underline ml-4">Delete</button>
+                </div>
+            </div>
+        `;
+    });
+}
+
+
+function updateInventoryView() {
+    const date = document.getElementById('inventory-date').value;
+    const vendorId = document.getElementById('inventory-vendor').value;
+    
+    if (!date || !vendorId) {
+        document.getElementById('inventory-results').classList.add('hidden');
+        return;
+    }
+
+    document.getElementById('inventory-results').classList.remove('hidden');
+
+    const stockOut = inventoryData
+        .filter(i => i.type === 'out' && i.date === date && i.vendorId == vendorId)
+        .reduce((sum, i) => sum + i.quantity, 0);
+
+    const stockIn = inventoryData
+        .filter(i => i.type === 'in' && i.date === date && i.vendorId == vendorId)
+        .reduce((sum, i) => sum + i.quantity, 0);
+        
+    const reportedSales = salesData
+        .filter(s => s.saleSource === 'Vendor' && isSameDateDay(new Date(s.date), new Date(date + "T00:00:00")) && s.vendorId == vendorId)
+        .reduce((sum, s) => sum + s.quantity, 0);
+
+    document.getElementById('inv-sent').textContent = stockOut;
+    document.getElementById('inv-returned').textContent = stockIn;
+    document.getElementById('inv-sold').textContent = reportedSales;
+    
+    const calculatedSold = stockOut - stockIn;
+    const discrepancy = calculatedSold - reportedSales;
+    const summaryEl = document.getElementById('inventory-summary');
+
+    if (discrepancy === 0) {
+        summaryEl.className = 'mt-6 p-4 rounded-lg bg-green-100 text-green-800';
+        summaryEl.innerHTML = `<h4 class="font-bold">Inventory Reconciled!</h4><p>Calculated sales (${calculatedSold}) match reported sales (${reportedSales}). All stock is accounted for.</p>`;
+    } else {
+        summaryEl.className = 'mt-6 p-4 rounded-lg bg-red-100 text-red-800';
+        summaryEl.innerHTML = `<h4 class="font-bold">Discrepancy Found!</h4><p>Calculated sales from stock movement is <strong>${calculatedSold}</strong>, but reported sales are <strong>${reportedSales}</strong>. There is a discrepancy of <strong>${discrepancy}</strong> units.</p>`;
+    }
+}
+
+function showModal(type, id = null) {
+    appState.editingId = id;
+    appState.editingType = type;
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modal-title');
+    const form = document.getElementById('modal-form');
+    let currentData = {}; 
+    let formHtml = '';
+    
+    let productOptions = productsData.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    if (productsData.length === 0 && (type === 'addSale' || type === 'editSale' || type.startsWith('addStock'))) {
+        productOptions = '<option value="">No Products - Add via Products Tab</option>';
+    }
+    
+    let vendorOptions = vendorsData.filter(v => v.status !== 'System').map(v => `<option value="${v.id}">${v.name}</option>`).join('');
+     if (vendorsData.filter(v => v.status !== 'System').length === 0 && (type === 'addSale' || type === 'editSale' || type.startsWith('addStock'))) {
+        vendorOptions = '<option value="">No Vendors - Add via Vendors Tab</option>';
+    }
+
+
+    switch(type) {
+        case 'addSale':
+            modalTitle.textContent = 'Add New Sale';
+            currentData = { 
+                date: new Date().toISOString().slice(0, 16), 
+                saleSource: 'Vendor', 
+                vendorId: vendorsData.find(v=>v.status !== 'System')?.id || '', 
+                productId: productsData[0]?.id || '' 
+            };
+            formHtml = getSaleFormHtml(currentData);
+            break;
+        case 'editSale':
+            modalTitle.textContent = 'Edit Sale';
+            currentData = salesData.find(s => s.id === id);
+            if (currentData) {
+                currentData.date = new Date(currentData.date).toISOString().slice(0, 16);
+            } else { currentData = { saleSource: 'Vendor' }; } 
+            formHtml = getSaleFormHtml(currentData);
+            break;
+        case 'addVendor':
+            modalTitle.textContent = 'Add New Vendor';
+            formHtml = getVendorFormHtml({});
+            break;
+        case 'editVendor':
+            modalTitle.textContent = 'Edit Vendor';
+            currentData = vendorsData.find(v => v.id === id) || {};
+            formHtml = getVendorFormHtml(currentData);
+            break;
+        case 'addProduct':
+            modalTitle.textContent = 'Add New Product';
+            formHtml = getProductFormHtml({});
+            break;
+        case 'editProduct':
+            modalTitle.textContent = 'Edit Product';
+            currentData = productsData.find(p => p.id === id) || {};
+            formHtml = getProductFormHtml(currentData);
+            break;
+        case 'addStockOut':
+            modalTitle.textContent = 'Log Stock Out';
+            currentData = { vendorId: vendorsData.find(v=>v.status !== 'System')?.id || '', productId: productsData[0]?.id || '' };
+            formHtml = getInventoryFormHtml('out', currentData);
+            break;
+        case 'addStockIn':
+            modalTitle.textContent = 'Log Stock In';
+            currentData = { vendorId: vendorsData.find(v=>v.status !== 'System')?.id || '', productId: productsData[0]?.id || '' };
+            formHtml = getInventoryFormHtml('in', currentData);
+            break;
+    }
+
+    form.innerHTML = formHtml;
+    
+    if (form.elements.saleSource && currentData.saleSource) form.elements.saleSource.value = currentData.saleSource;
+    if (form.elements.vendorId && currentData.vendorId) form.elements.vendorId.value = currentData.vendorId;
+    if (form.elements.productId && currentData.productId) form.elements.productId.value = currentData.productId;
+    
+    if (type === 'addSale' || type === 'editSale') {
+        toggleSaleFormFields(form.elements.saleSource.value);
+    }
+    if (type === 'addVendor' || type === 'editVendor') {
+        setTimeout(() => initializeVendorModalMap(currentData.latitude, currentData.longitude), 100);
+    }
+
+
+    modal.classList.remove('hidden');
+    setTimeout(() => modal.classList.remove('opacity-0'), 10);
+    setTimeout(() => modal.querySelector('.modal-content').classList.remove('scale-95'), 10);
+}
+
+function toggleSaleFormFields(source) {
+    const vendorField = document.getElementById('saleVendorField');
+    const eventFields = document.getElementById('eventSaleFields');
+
+    if (vendorField) vendorField.classList.toggle('hidden', source !== 'Vendor');
+    if (eventFields) eventFields.classList.toggle('hidden', source !== 'Event');
+}
+
+
+function getSaleFormHtml(data = {}) {
+    const defaultVendorId = vendorsData.find(v => v.status !== 'System')?.id || '';
+    const defaultProductId = productsData[0]?.id || '';
+
+    const selectedVendorId = data.vendorId || defaultVendorId;
+    const selectedProductId = data.productId || defaultProductId;
+
+    const vendorOptionsHtml = vendorsData.filter(v => v.status !== 'System').map(v => `<option value="${v.id}" ${v.id == selectedVendorId ? 'selected' : ''}>${v.name}</option>`).join('');
+    const productOptionsHtml = productsData.map(p => `<option value="${p.id}" ${p.id == selectedProductId ? 'selected' : ''}>${p.name}</option>`).join('');
+
+
+    return `
+        <input type="hidden" name="id" value="${data.id || ''}">
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Sale Source</label>
+                <select name="saleSource" id="saleSourceSelector" class="w-full p-2 border rounded mt-1" required>
+                    <option value="Vendor" ${data.saleSource === 'Vendor' ? 'selected' : ''}>Vendor Sale</option>
+                    <option value="Restaurant" ${data.saleSource === 'Restaurant' ? 'selected' : ''}>Restaurant Sale</option>
+                    <option value="Event" ${data.saleSource === 'Event' ? 'selected' : ''}>Event Sale</option>
+                </select>
+            </div>
+            <div id="saleVendorField" class="${data.saleSource !== 'Vendor' ? 'hidden' : ''}">
+                <label class="block text-sm font-medium text-slate-700">Vendor</label>
+                <select name="vendorId" class="w-full p-2 border rounded mt-1" ${vendorOptionsHtml ? '' : 'disabled'}>
+                    ${vendorOptionsHtml || '<option value="">Add Vendors First</option>'}
+                </select>
+            </div>
+             <div id="eventSaleFields" class="space-y-4 ${data.saleSource !== 'Event' ? 'hidden' : ''}">
+                <div><label class="block text-sm font-medium text-slate-700">Event Name/Location</label><input type="text" name="eventNameLocation" class="w-full p-2 border rounded mt-1" value="${data.eventNameLocation || ''}"></div>
+                <div><label class="block text-sm font-medium text-slate-700">Event Date</label><input type="date" name="eventDate" class="w-full p-2 border rounded mt-1" value="${data.eventDate || ''}"></div>
+                <div><label class="block text-sm font-medium text-slate-700">Event Time</label><input type="time" name="eventTime" class="w-full p-2 border rounded mt-1" value="${data.eventTime || ''}"></div>
+            </div>
+
+            <div><label class="block text-sm font-medium text-slate-700">Date & Time of Sale</label><input type="datetime-local" name="date" class="w-full p-2 border rounded mt-1" value="${data.date || new Date().toISOString().slice(0, 16)}" required></div>
+            <div><label class="block text-sm font-medium text-slate-700">Product</label><select name="productId" class="w-full p-2 border rounded mt-1" required ${productOptionsHtml ? '' : 'disabled'}>${productOptionsHtml || '<option value="">Add Products First</option>'}</select></div>
+            <div><label class="block text-sm font-medium text-slate-700">Quantity</label><input type="number" name="quantity" min="1" class="w-full p-2 border rounded mt-1" value="${data.quantity || 1}" required></div>
+            <div><label class="block text-sm font-medium text-slate-700">Payment Method</label><input type="text" name="paymentMethod" class="w-full p-2 border rounded mt-1" value="${data.paymentMethod || 'Cash'}" required></div>
+            <div><label class="block text-sm font-medium text-slate-700">Sales Platform</label><input type="text" name="salesPlatform" class="w-full p-2 border rounded mt-1" value="${data.salesPlatform || 'Walk-in'}" required></div>
+            <div><label class="block text-sm font-medium text-slate-700">Customer Name</label><input type="text" name="customerName" class="w-full p-2 border rounded mt-1" value="${data.customerName || 'Anonymous'}"></div>
+            <div><label class="block text-sm font-medium text-slate-700">Notes</label><textarea name="notes" class="w-full p-2 border rounded mt-1">${data.notes || ''}</textarea></div>
+        </div>
+        <div class="mt-6 text-right"><button type="submit" class="bg-yellow-600 text-white font-bold py-2 px-6 rounded-lg" ${productOptionsHtml && (data.saleSource !== 'Vendor' || vendorOptionsHtml) ? '' : 'disabled'}>Save Sale</button></div>
+    `;
+}
+
+function getVendorFormHtml(data = {}) {
+    return `
+        <input type="hidden" name="id" value="${data.id || ''}">
+        <div class="space-y-4">
+            <div><label class="block text-sm font-medium text-slate-700">Name</label><input type="text" name="name" class="w-full p-2 border rounded mt-1" value="${data.name || ''}" required></div>
+            <div><label class="block text-sm font-medium text-slate-700">Contact</label><input type="tel" name="contact" class="w-full p-2 border rounded mt-1" value="${data.contact || ''}"></div>
+            <div><label class="block text-sm font-medium text-slate-700">Area</label><input type="text" name="area" class="w-full p-2 border rounded mt-1" value="${data.area || ''}"></div>
+            <div><label class="block text-sm font-medium text-slate-700">Commission Rate (RM)</label><input type="number" step="0.01" name="commissionRate" class="w-full p-2 border rounded mt-1" value="${data.commissionRate !== undefined ? data.commissionRate.toFixed(2) : 1.00}"></div>
+            <div><label class="block text-sm font-medium text-slate-700">Closure Day</label><input type="text" name="closureDay" class="w-full p-2 border rounded mt-1" value="${data.closureDay || 'None'}"></div>
+            <div><label class="block text-sm font-medium text-slate-700">Payment Method</label><input type="text" name="paymentMethod" class="w-full p-2 border rounded mt-1" value="${data.paymentMethod || 'COD'}"></div>
+            
+            <div id="vendor-modal-map-container"></div>
+            <div><label class="block text-sm font-medium text-slate-700">Latitude</label><input type="text" id="vendorLatitude" name="latitude" class="w-full p-2 border rounded mt-1" value="${data.latitude || ''}" placeholder="Populated by map"></div>
+            <div><label class="block text-sm font-medium text-slate-700">Longitude</label><input type="text" id="vendorLongitude" name="longitude" class="w-full p-2 border rounded mt-1" value="${data.longitude || ''}" placeholder="Populated by map"></div>
+            <p class="text-xs text-slate-500">Search or click map to set location. Coordinates will auto-fill.</p>
+
+            <div><label class="block text-sm font-medium text-slate-700">Status</label><select name="status" class="w-full p-2 border rounded mt-1"><option value="Active" ${data.status === 'Active' ? 'selected' : ''}>Active</option><option value="Inactive" ${data.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></div>
+        </div>
+        <div class="mt-6 text-right"><button type="submit" class="bg-yellow-600 text-white font-bold py-2 px-6 rounded-lg">Save Vendor</button></div>
+    `;
+}
+function getProductFormHtml(data = {}) {
+    return `
+        <input type="hidden" name="id" value="${data.id || ''}">
+        <div class="space-y-4">
+            <div><label class="block text-sm font-medium text-slate-700">Product Name</label><input type="text" name="name" class="w-full p-2 border rounded mt-1" value="${data.name || ''}" required></div>
+            <div><label class="block text-sm font-medium text-slate-700">Price (RM)</label><input type="number" step="0.01" name="price" class="w-full p-2 border rounded mt-1" value="${data.price !== undefined ? data.price.toFixed(2) : ''}" required></div>
+        </div>
+        <div class="mt-6 text-right"><button type="submit" class="bg-yellow-600 text-white font-bold py-2 px-6 rounded-lg">Save Product</button></div>
+    `;
+}
+
+
+function getInventoryFormHtml(type, data = {}) {
+    const today = new Date().toISOString().split('T')[0];
+    const selectedVendorId = data.vendorId || (vendorsData.find(v=>v.status !== 'System') ? vendorsData.find(v=>v.status !== 'System').id : '');
+    const selectedProductId = data.productId || (productsData[0] ? productsData[0].id : '');
+    
+    const vendorSelectHtml = vendorsData.filter(v => v.status !== 'System').map(v => `<option value="${v.id}" ${v.id == selectedVendorId ? 'selected' : ''}>${v.name}</option>`).join('');
+    const productSelectHtml = productsData.map(p => `<option value="${p.id}" ${p.id == selectedProductId ? 'selected' : ''}>${p.name}</option>`).join('');
+
+    return `
+        <input type="hidden" name="type" value="${type}">
+        <div class="space-y-4">
+            <div><label class="block text-sm font-medium text-slate-700">Date</label><input type="date" name="date" class="w-full p-2 border rounded mt-1" value="${data.date || today}" required></div>
+            <div><label class="block text-sm font-medium text-slate-700">Vendor</label><select name="vendorId" class="w-full p-2 border rounded mt-1" required ${vendorSelectHtml ? '' : 'disabled'}>${vendorSelectHtml || '<option value="">Add Vendors First</option>'}</select></div>
+            <div><label class="block text-sm font-medium text-slate-700">Product</label><select name="productId" class="w-full p-2 border rounded mt-1" required ${productSelectHtml ? '' : 'disabled'}>${productSelectHtml || '<option value="">Add Products First</option>'}</select></div>
+            <div><label class="block text-sm font-medium text-slate-700">Quantity</label><input type="number" name="quantity" min="1" class="w-full p-2 border rounded mt-1" value="${data.quantity || ''}" required></div>
+        </div>
+        <div class="mt-6 text-right"><button type="submit" class="bg-yellow-600 text-white font-bold py-2 px-6 rounded-lg" ${productSelectHtml && vendorSelectHtml ? '' : 'disabled'}>Log Stock</button></div>
+    `;
+}
+
+function hideModal() {
+    const modal = document.getElementById('modal');
+    modal.classList.add('opacity-0');
+    modal.querySelector('.modal-content').classList.add('scale-95');
+    setTimeout(() => modal.classList.add('hidden'), 250);
+    if (vendorModalMap) {
+        vendorModalMap.remove();
+        vendorModalMap = null;
+        vendorMarker = null;
+    }
+}
+
+function handleFormSubmit(event) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    const data = Object.fromEntries(formData.entries());
+
+    switch (appState.editingType) {
+        case 'addSale':
+        case 'editSale':
+            saveSale(data);
+            break;
+        case 'addVendor':
+        case 'editVendor':
+            saveVendor(data);
+            break;
+        case 'addProduct':
+        case 'editProduct':
+            saveProduct(data);
+            break;
+        case 'addStockOut':
+        case 'addStockIn':
+            saveInventory(data);
+            break;
+    }
+
+    hideModal();
+    if (appState.currentView === 'inventory' && (appState.editingType === 'addStockOut' || appState.editingType === 'addStockIn')) {
+        updateInventoryView(); 
+    } else {
+        changeView(appState.currentView); 
+    }
+    saveAllDataToLocalStorage();
+}
+
+function saveSale(data) {
+    const product = productsData.find(p => p.id == data.productId);
+    let vendor;
+    let commissionRate = 0;
+    let actualVendorId;
+
+    if (data.saleSource === 'Vendor') {
+        vendor = vendorsData.find(v => v.id == data.vendorId);
+        if (!vendor) { console.error("Vendor not found for Vendor Sale"); return; }
+        commissionRate = vendor.commissionRate;
+        actualVendorId = vendor.id;
+    } else { 
+        vendor = vendorsData.find(v => v.name === 'Restaurant Direct' && v.status === 'System');
+        if (!vendor) { 
+            vendor = { id: Date.now() + 2000, name: 'Restaurant Direct', commissionRate: 0, status: 'System', latitude: null, longitude: null };
+            vendorsData.push(vendor); 
+        }
+        actualVendorId = vendor.id;
+    }
+    
+    if (!product) { console.error("Product not found for Sale"); return; }
+
+
+    const saleObject = {
+        id: data.id ? parseInt(data.id) : Date.now(),
+        date: new Date(data.date).toISOString(),
+        saleSource: data.saleSource,
+        vendorId: actualVendorId, 
+        productId: parseInt(data.productId),
+        quantity: parseInt(data.quantity),
+        pricePerUnit: product.price,
+        commissionPerUnit: commissionRate, 
+        paymentMethod: data.paymentMethod,
+        salesPlatform: data.salesPlatform,
+        customerName: data.customerName,
+        notes: data.notes,
+        eventNameLocation: data.saleSource === 'Event' ? data.eventNameLocation : null,
+        eventDate: data.saleSource === 'Event' ? data.eventDate : null,
+        eventTime: data.saleSource === 'Event' ? data.eventTime : null,
+    };
+
+    if(data.id && salesData.some(s => s.id == data.id)) { 
+        const index = salesData.findIndex(s => s.id == data.id);
+        salesData[index] = saleObject;
+    } else { 
+        salesData.push(saleObject);
+    }
+}
+
+function saveVendor(data) {
+    const vendorObject = {
+        id: data.id ? parseInt(data.id) : Date.now(),
+        name: data.name,
+        contact: data.contact,
+        area: data.area,
+        commissionRate: parseFloat(data.commissionRate),
+        closureDay: data.closureDay,
+        paymentMethod: data.paymentMethod,
+        latitude: data.latitude ? parseFloat(data.latitude) : null,
+        longitude: data.longitude ? parseFloat(data.longitude) : null,
+        status: data.status
+    };
+
+    if(data.id && vendorsData.some(v => v.id == data.id)) {
+        const index = vendorsData.findIndex(v => v.id == data.id);
+        vendorsData[index] = vendorObject;
+    } else {
+        vendorsData.push(vendorObject);
+    }
+}
+
+function saveProduct(data) {
+    const productObject = {
+        id: data.id ? parseInt(data.id) : Date.now(),
+        name: data.name,
+        price: parseFloat(data.price)
+    };
+
+    if (data.id && productsData.some(p => p.id == data.id)) {
+        const index = productsData.findIndex(p => p.id == data.id);
+        productsData[index] = productObject;
+    } else {
+        productsData.push(productObject);
+    }
+    populateFilters(); 
+}
+
+
+function saveInventory(data) {
+     const product = productsData.find(p => p.id == data.productId);
+    const vendor = vendorsData.find(v => v.id == data.vendorId);
+    if (!product || !vendor) {
+        console.error("Invalid product or vendor for inventory log:", data);
+        return;
+    }
+    inventoryData.push({
+        id: Date.now(), 
+        type: data.type,
+        date: data.date,
+        vendorId: parseInt(data.vendorId),
+        productId: parseInt(data.productId),
+        quantity: parseInt(data.quantity)
+    });
+}
+
+function deleteItem(type, id) {
+    const confirmDialog = document.getElementById('confirm-dialog');
+    const title = document.getElementById('confirm-title');
+    const message = document.getElementById('confirm-message');
+    
+    title.textContent = `Delete ${type}?`;
+    message.textContent = `Are you sure you want to permanently delete this ${type}? This action cannot be undone.`;
+    
+    confirmDialog.classList.remove('hidden');
+    setTimeout(() => confirmDialog.classList.remove('opacity-0'), 10);
+
+    const cancelBtn = document.getElementById('confirm-btn-cancel');
+    const okBtn = document.getElementById('confirm-btn-ok');
+
+    const handleConfirm = () => {
+        if (type === 'sale') {
+            salesData = salesData.filter(item => item.id !== id);
+        } else if (type === 'vendor') {
+            vendorsData = vendorsData.filter(item => item.id !== id);
+             if (appMap) initializeDashboardMap(); 
+        } else if (type === 'product') {
+            productsData = productsData.filter(item => item.id !== id);
+            populateFilters(); 
+        }
+        saveAllDataToLocalStorage();
+        changeView(appState.currentView);
+        closeDialog();
+    };
+
+    const closeDialog = () => {
+        confirmDialog.classList.add('opacity-0');
+        setTimeout(() => confirmDialog.classList.add('hidden'), 250);
+        okBtn.removeEventListener('click', handleConfirm);
+        cancelBtn.removeEventListener('click', closeDialog);
+    };
+    
+    okBtn.addEventListener('click', handleConfirm, { once: true });
+    cancelBtn.addEventListener('click', closeDialog, { once: true });
+}
+
+</script>
+</body>
+</html>
