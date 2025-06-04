@@ -2,12 +2,8 @@
 <html lang="en">
 <head>
     <!-- Chosen Palette: Calm Neutrals with Muted Gold & Green Accents -->
-    <!-- Application Structure Plan: A task-oriented Single Page Application (SPA) with a tab-based navigation system. Added a map to the Dashboard for vendor visualization. Vendor data now includes latitude/longitude for map plotting. Vendor modal now includes an interactive map with search and point-to-select for location input. -->
-    <!-- Visualization & Content Choices: 
-        - Dashboard Map (Goal: Inform/Organize, Library: Leaflet.js): Displays vendor locations with popups for names.
-        - Vendor Modal Map (Goal: Input/Organize, Library: Leaflet.js + Leaflet Control Geocoder): Allows users to search for addresses or click on the map to set vendor latitude/longitude.
-        - Other elements remain similar, focusing on their respective goals.
-    -->
+    <!-- Application Structure Plan: A task-oriented Single Page Application (SPA) with a tab-based navigation system. Login functionality has been removed for direct access. All features are now available by default. -->
+    <!-- Visualization & Content Choices: Dashboard map, vendor modal map, charts, and tables function as before but without role-based restrictions. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -33,33 +29,59 @@
         .modal { transition: opacity 0.25s ease; }
         .modal-content { transition: transform 0.25s ease; }
         input:focus, select:focus, textarea:focus { border-color: #ca8a04 !important; outline: 1px solid #ca8a04; }
-        #critical-error-message-container { padding: 20px; text-align: center; font-family: sans-serif; color: red; background-color: #fff0f0; border: 1px solid red; margin: 10px; }
-        .leaflet-control-geocoder-form input { width: 100% !important; } /* Ensure geocoder input is full width */
+        .leaflet-control-geocoder-form input { width: 100% !important; } 
+        .custom-file-input::-webkit-file-upload-button { visibility: hidden; }
+        .custom-file-input::before {
+            content: 'Upload Data (JSON)';
+            display: inline-block;
+            background: #4a5568; 
+            color: white;
+            border: 1px solid #4a5568;
+            border-radius: 0.375rem; 
+            padding: 0.5rem 1rem; 
+            outline: none;
+            white-space: nowrap;
+            -webkit-user-select: none;
+            user-select: none;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.875rem; 
+        }
+        .custom-file-input:hover::before { background: #2d3748; }
+        .custom-file-input:active::before { background: #1a202c; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
 
-    <div id="critical-error-message-container" class="hidden"></div>
     <div id="app-container" class="max-w-7xl mx-auto p-4 md:p-6">
 
         <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Nasi Arab Sales System</h1>
-                <p class="text-slate-500">Welcome, Chef Ammar!</p>
+                <p class="text-slate-500" id="welcome-message">Welcome, Chef Ammar!</p>
             </div>
-            <button onclick="showModal('addSale')" class="mt-4 sm:mt-0 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                Add New Sale
-            </button>
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2 mt-4 sm:mt-0">
+                <button id="download-data-btn" onclick="downloadData()" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-lg shadow-md text-sm">
+                    Download Data
+                </button>
+                <input type="file" id="uploadDataInput" class="custom-file-input hidden" accept=".json" onchange="handleFileUpload(event)">
+                <label for="uploadDataInput" id="upload-data-label" class="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-4 rounded-lg shadow-md text-sm cursor-pointer">
+                    Upload Data
+                </label>
+                 <button id="add-sale-main-btn" onclick="showModal('addSale')" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center text-sm">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    Add Sale
+                </button>
+            </div>
         </header>
 
-        <nav class="mb-6 border-b border-slate-200">
+        <nav id="main-nav" class="mb-6 border-b border-slate-200">
             <ul class="flex flex-wrap -mb-px">
-                <li class="mr-2"><button onclick="changeView('dashboard')" data-view="dashboard" class="inline-block p-4 rounded-t-lg tab-active">Dashboard</button></li>
-                <li class="mr-2"><button onclick="changeView('sales')" data-view="sales" class="inline-block p-4 rounded-t-lg tab-inactive">Sales Records</button></li>
-                <li class="mr-2"><button onclick="changeView('vendors')" data-view="vendors" class="inline-block p-4 rounded-t-lg tab-inactive">Vendors</button></li>
-                <li class="mr-2"><button onclick="changeView('products')" data-view="products" class="inline-block p-4 rounded-t-lg tab-inactive">Products</button></li>
-                <li class="mr-2"><button onclick="changeView('inventory')" data-view="inventory" class="inline-block p-4 rounded-t-lg tab-inactive">Inventory</button></li>
+                <li class="mr-2"><button onclick="changeView('dashboard')" data-view="dashboard" class="nav-item inline-block p-4 rounded-t-lg tab-active">Dashboard</button></li>
+                <li class="mr-2"><button onclick="changeView('sales')" data-view="sales" class="nav-item inline-block p-4 rounded-t-lg tab-inactive">Sales Records</button></li>
+                <li class="mr-2"><button onclick="changeView('vendors')" data-view="vendors" class="nav-item inline-block p-4 rounded-t-lg tab-inactive">Vendors</button></li>
+                <li class="mr-2"><button onclick="changeView('products')" data-view="products" class="nav-item inline-block p-4 rounded-t-lg tab-inactive">Products</button></li>
+                <li class="mr-2"><button onclick="changeView('inventory')" data-view="inventory" class="nav-item inline-block p-4 rounded-t-lg tab-inactive">Inventory</button></li>
             </ul>
         </nav>
 
@@ -82,7 +104,7 @@
                     <div class="bg-white p-5 rounded-lg shadow"><h4 class="text-slate-500">Total Orders</h4><p id="metric-orders" class="text-3xl font-bold">0</p></div>
                 </div>
 
-                <div class="mb-6 bg-white p-5 rounded-lg shadow">
+                <div id="dashboard-map-section" class="mb-6 bg-white p-5 rounded-lg shadow">
                     <h3 class="font-semibold mb-4 text-center text-xl">Vendor Locations</h3>
                     <div id="map-container"></div>
                 </div>
@@ -208,7 +230,6 @@
                     </div>
                  </div>
             </div>
-
         </main>
     </div>
 
@@ -235,7 +256,16 @@
             </div>
         </div>
     </div>
-
+    <div id="upload-confirm-dialog" class="modal fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 hidden opacity-0">
+        <div class="bg-white w-full max-w-sm rounded-lg shadow-xl p-6 text-center">
+            <h3 id="upload-confirm-title" class="text-lg font-bold mb-2">Confirm Upload</h3>
+            <p id="upload-confirm-message" class="text-slate-600 mb-6">Uploading this file will overwrite all current data. Are you sure you want to proceed?</p>
+            <div class="flex justify-center gap-4">
+                <button id="upload-confirm-btn-cancel" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg">Cancel</button>
+                <button id="upload-confirm-btn-ok" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-6 rounded-lg">Upload & Overwrite</button>
+            </div>
+        </div>
+    </div>
 
 <script>
 let salesData = [];
@@ -290,6 +320,12 @@ function formatDate(date, formatStr) {
     }
     if (formatStr === 'MMM d') {
          return `${months[d.getMonth()]} ${d.getDate()}`;
+    }
+    if (formatStr === 'yyyy-MM-dd') { 
+        const year = d.getFullYear();
+        const month = (d.getMonth() + 1).toString().padStart(2, '0');
+        const dayOfMonth = d.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${dayOfMonth}`;
     }
     return d.toLocaleDateString(); 
 }
@@ -377,7 +413,7 @@ window.onload = () => {
 
 
 function initializeViews() {
-    changeView('dashboard');
+    changeView('dashboard'); 
     populateFilters();
     const today = new Date();
     const isoDate = today.toISOString().split('T')[0];
@@ -400,7 +436,7 @@ function changeView(viewName) {
     document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
     document.getElementById(`view-${viewName}`).classList.remove('hidden');
 
-    document.querySelectorAll('nav button').forEach(b => {
+    document.querySelectorAll('#main-nav button.nav-item').forEach(b => {
         if (b.dataset.view === viewName) {
             b.classList.remove('tab-inactive');
             b.classList.add('tab-active');
@@ -465,12 +501,13 @@ function initializeVendorModalMap(lat, lon) {
     if (vendorModalMap) {
         vendorModalMap.remove();
         vendorModalMap = null;
-        vendorMarker = null; // Reset marker as well
+        vendorMarker = null; 
     }
 
     const initialLat = lat || 2.9935; 
     const initialLon = lon || 101.7874;
-    const initialZoom = (lat && lon) ? 15 : 11;
+    const initialZoom = (lat && lon && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lon))) ? 15 : 11;
+
 
     vendorModalMap = L.map(mapContainerId).setView([initialLat, initialLon], initialZoom);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -498,7 +535,6 @@ function initializeVendorModalMap(lat, lon) {
         document.getElementById('vendorLatitude').value = e.latlng.lat.toFixed(6);
         document.getElementById('vendorLongitude').value = e.latlng.lng.toFixed(6);
     });
-     // Invalidate size after a short delay to ensure the map container is fully rendered in the modal
     setTimeout(() => {
         if (vendorModalMap) {
             vendorModalMap.invalidateSize();
@@ -1270,6 +1306,80 @@ function deleteItem(type, id) {
     
     okBtn.addEventListener('click', handleConfirm, { once: true });
     cancelBtn.addEventListener('click', closeDialog, { once: true });
+}
+
+// --- Data Download/Upload ---
+function downloadData() {
+    const allData = {
+        salesData,
+        vendorsData,
+        productsData,
+        inventoryData
+        // usersData removed as login is removed
+    };
+    const jsonString = JSON.stringify(allData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nasi_arab_sales_data_backup_${formatDate(new Date(), 'yyyy-MM-dd')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const uploadedData = JSON.parse(e.target.result);
+                
+                const dialog = document.getElementById('upload-confirm-dialog');
+                dialog.classList.remove('hidden');
+                setTimeout(() => dialog.classList.remove('opacity-0'), 10);
+
+                const cancelBtn = document.getElementById('upload-confirm-btn-cancel');
+                const okBtn = document.getElementById('upload-confirm-btn-ok');
+
+                const closeUploadDialog = () => {
+                    dialog.classList.add('opacity-0');
+                    setTimeout(() => dialog.classList.add('hidden'), 250);
+                    okBtn.removeEventListener('click', proceedWithUpload);
+                    cancelBtn.removeEventListener('click', closeUploadDialog);
+                     event.target.value = null; 
+                };
+                
+                const proceedWithUpload = () => {
+                    // Basic validation of uploaded data structure (without usersData)
+                    if (uploadedData.salesData && uploadedData.vendorsData && uploadedData.productsData && uploadedData.inventoryData) {
+                        salesData = uploadedData.salesData;
+                        vendorsData = uploadedData.vendorsData;
+                        productsData = uploadedData.productsData;
+                        inventoryData = uploadedData.inventoryData;
+                        
+                        saveAllDataToLocalStorage();
+                        initializeAppLogic(); // Re-initialize everything with new data
+                        alert('Data uploaded and restored successfully!');
+                    } else {
+                        alert('Error: Invalid data file structure. Please upload a valid backup file.');
+                    }
+                    closeUploadDialog();
+                };
+                
+                okBtn.addEventListener('click', proceedWithUpload, {once: true});
+                cancelBtn.addEventListener('click', closeUploadDialog, {once: true});
+
+            } catch (error) {
+                console.error('Error parsing uploaded file:', error);
+                alert('Error: Could not parse the uploaded file. Please ensure it is a valid JSON backup.');
+                event.target.value = null; 
+            }
+        };
+        reader.readAsText(file);
+    }
 }
 
 </script>
