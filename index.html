@@ -2,8 +2,13 @@
 <html lang="en">
 <head>
     <!-- Chosen Palette: Calm Neutrals with Muted Gold & Green Accents -->
-    <!-- Application Structure Plan: A task-oriented Single Page Application (SPA) with a tab-based navigation system. Login functionality has been removed for direct access. All features are now available by default. -->
-    <!-- Visualization & Content Choices: Dashboard map, vendor modal map, charts, and tables function as before but without role-based restrictions. -->
+    <!-- Application Structure Plan: A task-oriented Single Page Application (SPA) with a tab-based navigation system (Dashboard, Sales Records, Vendors, Products). Login functionality has been removed for direct access. All features are now available by default. Inventory/stock tracking functionality has been removed. -->
+    <!-- Visualization & Content Choices: 
+        - Dashboard Map (Goal: Inform/Organize, Library: Leaflet.js): Displays vendor locations with popups for names.
+        - Vendor Modal Map (Goal: Input/Organize, Library: Leaflet.js + Leaflet Control Geocoder): Allows users to search for addresses or click on the map to set vendor latitude/longitude.
+        - Data Management (Goal: Backup/Restore): Buttons for downloading application data (excluding inventory) as JSON and uploading a JSON file to restore data.
+        - Other charts and tables function as before, focusing on sales, vendors, and products.
+    -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -81,7 +86,6 @@
                 <li class="mr-2"><button onclick="changeView('sales')" data-view="sales" class="nav-item inline-block p-4 rounded-t-lg tab-inactive">Sales Records</button></li>
                 <li class="mr-2"><button onclick="changeView('vendors')" data-view="vendors" class="nav-item inline-block p-4 rounded-t-lg tab-inactive">Vendors</button></li>
                 <li class="mr-2"><button onclick="changeView('products')" data-view="products" class="nav-item inline-block p-4 rounded-t-lg tab-inactive">Products</button></li>
-                <li class="mr-2"><button onclick="changeView('inventory')" data-view="inventory" class="nav-item inline-block p-4 rounded-t-lg tab-inactive">Inventory</button></li>
             </ul>
         </nav>
 
@@ -190,46 +194,6 @@
                 <p id="product-list-empty" class="text-center p-8 text-slate-500 hidden">No products added yet. Click 'Add New Product' to start.</p>
            </div>
             
-            <div id="view-inventory" class="view hidden">
-                 <div class="bg-white p-6 rounded-lg shadow">
-                    <h2 class="text-2xl font-bold mb-4">Inventory Reconciliation</h2>
-                    <p class="text-slate-600 mb-6">Use this section to compare stock sent to vendors against their reported sales for any given day. This helps identify discrepancies quickly.</p>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end">
-                        <div>
-                            <label for="inventory-date" class="block text-sm font-medium text-slate-700">Date</label>
-                            <input type="date" id="inventory-date" onchange="updateInventoryView()" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2">
-                        </div>
-                        <div>
-                            <label for="inventory-vendor" class="block text-sm font-medium text-slate-700">Vendor</label>
-                            <select id="inventory-vendor" onchange="updateInventoryView()" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></select>
-                        </div>
-                        <button onclick="updateInventoryView()" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow-md h-10">Check Inventory</button>
-                    </div>
-
-                    <div id="inventory-results" class="hidden">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                            <div class="bg-blue-100 p-4 rounded-lg">
-                                <h4 class="font-semibold text-blue-800">Stock Sent</h4>
-                                <p id="inv-sent" class="text-2xl font-bold text-blue-900">0</p>
-                                <button onclick="showModal('addStockOut')" class="text-sm text-blue-600 hover:underline mt-1">Log Stock Out</button>
-                            </div>
-                            <div class="bg-red-100 p-4 rounded-lg">
-                                <h4 class="font-semibold text-red-800">Stock Returned</h4>
-                                <p id="inv-returned" class="text-2xl font-bold text-red-900">0</p>
-                                <button onclick="showModal('addStockIn')" class="text-sm text-red-600 hover:underline mt-1">Log Stock In</button>
-                            </div>
-                             <div class="bg-green-100 p-4 rounded-lg">
-                                <h4 class="font-semibold text-green-800">Reported Sales</h4>
-                                <p id="inv-sold" class="text-2xl font-bold text-green-900">0</p>
-                                <p class="text-xs text-slate-500">(from Sales Records)</p>
-                            </div>
-                        </div>
-                         <div class="mt-6 p-4 rounded-lg" id="inventory-summary">
-                            </div>
-                    </div>
-                 </div>
-            </div>
         </main>
     </div>
 
@@ -271,7 +235,7 @@
 let salesData = [];
 let vendorsData = [];
 let productsData = []; 
-let inventoryData = [];
+// inventoryData removed
 
 let charts = {};
 let appMap = null; 
@@ -344,7 +308,7 @@ function saveAllDataToLocalStorage() {
     localStorage.setItem('nasiArabSalesData', JSON.stringify(salesData));
     localStorage.setItem('nasiArabVendorsData', JSON.stringify(vendorsData));
     localStorage.setItem('nasiArabProductsData', JSON.stringify(productsData));
-    localStorage.setItem('nasiArabInventoryData', JSON.stringify(inventoryData));
+    // inventoryData removed from saving
     console.log("Data saved to localStorage");
 }
 
@@ -352,7 +316,7 @@ function loadDataFromLocalStorage() {
     const sales = localStorage.getItem('nasiArabSalesData');
     const vendors = localStorage.getItem('nasiArabVendorsData');
     const products = localStorage.getItem('nasiArabProductsData');
-    const inventory = localStorage.getItem('nasiArabInventoryData');
+    // inventoryData removed from loading
 
     let loadedSuccessfully = true;
 
@@ -364,11 +328,9 @@ function loadDataFromLocalStorage() {
     
     if (products) try { productsData = JSON.parse(products); } catch (e) { console.error("Error parsing productsData:", e); loadedSuccessfully = false; productsData = []; }
     else { loadedSuccessfully = false; productsData = []; }
-
-    if (inventory) try { inventoryData = JSON.parse(inventory); } catch (e) { console.error("Error parsing inventoryData:", e); loadedSuccessfully = false; inventoryData = []; }
-    else { loadedSuccessfully = false; inventoryData = []; }
     
-    if (loadedSuccessfully && sales && vendors && products && inventory) {
+    // inventoryData removed
+    if (loadedSuccessfully && sales && vendors && products) { // Check for products now
         console.log("All data loaded from localStorage");
         return true;
     }
@@ -381,7 +343,7 @@ function generateAndEnsureDefaultData() {
     if (!Array.isArray(productsData)) productsData = [];
     if (!Array.isArray(vendorsData)) vendorsData = [];
     if (!Array.isArray(salesData)) salesData = [];
-    if (!Array.isArray(inventoryData)) inventoryData = [];
+    // inventoryData removed
 
     if (vendorsData.length === 0 || !vendorsData.some(v => v.name === 'Restaurant Direct' && v.status === 'System')) {
          vendorsData.push(
@@ -415,9 +377,7 @@ window.onload = () => {
 function initializeViews() {
     changeView('dashboard'); 
     populateFilters();
-    const today = new Date();
-    const isoDate = today.toISOString().split('T')[0];
-    document.getElementById('inventory-date').value = isoDate;
+    // Inventory date input removed
 }
 
 function attachEventListeners() {
@@ -454,7 +414,7 @@ function changeView(viewName) {
         case 'sales': renderSalesTable(); break;
         case 'vendors': renderVendorList(); break;
         case 'products': renderProductList(); break;
-        case 'inventory': updateInventoryView(); break;
+        // inventory case removed
     }
 }
 
@@ -554,20 +514,17 @@ function updateVendorMarker(latlng) {
 function populateFilters() {
     const vendorFilter = document.getElementById('sales-vendor-filter');
     const platformFilter = document.getElementById('sales-platform-filter');
-    const inventoryVendorFilter = document.getElementById('inventory-vendor');
+    // inventoryVendorFilter removed
     
     vendorFilter.innerHTML = '<option value="">All Vendors (for Vendor Sales)</option>';
-    inventoryVendorFilter.innerHTML = ''; 
     vendorsData.forEach(v => {
         if (v.status !== 'System') {
             const optionHTML = `<option value="${v.id}">${v.name}</option>`;
             vendorFilter.innerHTML += optionHTML;
-            inventoryVendorFilter.innerHTML += optionHTML;
         }
     });
      if (vendorsData.filter(v => v.status !== 'System').length === 0) {
         vendorFilter.innerHTML = '<option value="">No Vendors Added</option>';
-        inventoryVendorFilter.innerHTML = '<option value="">No Vendors Added</option>';
     }
 
 
@@ -882,45 +839,7 @@ function renderProductList() {
 }
 
 
-function updateInventoryView() {
-    const date = document.getElementById('inventory-date').value;
-    const vendorId = document.getElementById('inventory-vendor').value;
-    
-    if (!date || !vendorId) {
-        document.getElementById('inventory-results').classList.add('hidden');
-        return;
-    }
-
-    document.getElementById('inventory-results').classList.remove('hidden');
-
-    const stockOut = inventoryData
-        .filter(i => i.type === 'out' && i.date === date && i.vendorId == vendorId)
-        .reduce((sum, i) => sum + i.quantity, 0);
-
-    const stockIn = inventoryData
-        .filter(i => i.type === 'in' && i.date === date && i.vendorId == vendorId)
-        .reduce((sum, i) => sum + i.quantity, 0);
-        
-    const reportedSales = salesData
-        .filter(s => s.saleSource === 'Vendor' && isSameDateDay(new Date(s.date), new Date(date + "T00:00:00")) && s.vendorId == vendorId)
-        .reduce((sum, s) => sum + s.quantity, 0);
-
-    document.getElementById('inv-sent').textContent = stockOut;
-    document.getElementById('inv-returned').textContent = stockIn;
-    document.getElementById('inv-sold').textContent = reportedSales;
-    
-    const calculatedSold = stockOut - stockIn;
-    const discrepancy = calculatedSold - reportedSales;
-    const summaryEl = document.getElementById('inventory-summary');
-
-    if (discrepancy === 0) {
-        summaryEl.className = 'mt-6 p-4 rounded-lg bg-green-100 text-green-800';
-        summaryEl.innerHTML = `<h4 class="font-bold">Inventory Reconciled!</h4><p>Calculated sales (${calculatedSold}) match reported sales (${reportedSales}). All stock is accounted for.</p>`;
-    } else {
-        summaryEl.className = 'mt-6 p-4 rounded-lg bg-red-100 text-red-800';
-        summaryEl.innerHTML = `<h4 class="font-bold">Discrepancy Found!</h4><p>Calculated sales from stock movement is <strong>${calculatedSold}</strong>, but reported sales are <strong>${reportedSales}</strong>. There is a discrepancy of <strong>${discrepancy}</strong> units.</p>`;
-    }
-}
+// updateInventoryView removed as inventory functionality is removed
 
 function showModal(type, id = null) {
     appState.editingId = id;
@@ -932,12 +851,12 @@ function showModal(type, id = null) {
     let formHtml = '';
     
     let productOptions = productsData.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-    if (productsData.length === 0 && (type === 'addSale' || type === 'editSale' || type.startsWith('addStock'))) {
+    if (productsData.length === 0 && (type === 'addSale' || type === 'editSale')) { // Removed stock check
         productOptions = '<option value="">No Products - Add via Products Tab</option>';
     }
     
     let vendorOptions = vendorsData.filter(v => v.status !== 'System').map(v => `<option value="${v.id}">${v.name}</option>`).join('');
-     if (vendorsData.filter(v => v.status !== 'System').length === 0 && (type === 'addSale' || type === 'editSale' || type.startsWith('addStock'))) {
+     if (vendorsData.filter(v => v.status !== 'System').length === 0 && (type === 'addSale' || type === 'editSale')) { // Removed stock check
         vendorOptions = '<option value="">No Vendors - Add via Vendors Tab</option>';
     }
 
@@ -979,16 +898,7 @@ function showModal(type, id = null) {
             currentData = productsData.find(p => p.id === id) || {};
             formHtml = getProductFormHtml(currentData);
             break;
-        case 'addStockOut':
-            modalTitle.textContent = 'Log Stock Out';
-            currentData = { vendorId: vendorsData.find(v=>v.status !== 'System')?.id || '', productId: productsData[0]?.id || '' };
-            formHtml = getInventoryFormHtml('out', currentData);
-            break;
-        case 'addStockIn':
-            modalTitle.textContent = 'Log Stock In';
-            currentData = { vendorId: vendorsData.find(v=>v.status !== 'System')?.id || '', productId: productsData[0]?.id || '' };
-            formHtml = getInventoryFormHtml('in', currentData);
-            break;
+        // Stock cases removed
     }
 
     form.innerHTML = formHtml;
@@ -1098,25 +1008,7 @@ function getProductFormHtml(data = {}) {
 }
 
 
-function getInventoryFormHtml(type, data = {}) {
-    const today = new Date().toISOString().split('T')[0];
-    const selectedVendorId = data.vendorId || (vendorsData.find(v=>v.status !== 'System') ? vendorsData.find(v=>v.status !== 'System').id : '');
-    const selectedProductId = data.productId || (productsData[0] ? productsData[0].id : '');
-    
-    const vendorSelectHtml = vendorsData.filter(v => v.status !== 'System').map(v => `<option value="${v.id}" ${v.id == selectedVendorId ? 'selected' : ''}>${v.name}</option>`).join('');
-    const productSelectHtml = productsData.map(p => `<option value="${p.id}" ${p.id == selectedProductId ? 'selected' : ''}>${p.name}</option>`).join('');
-
-    return `
-        <input type="hidden" name="type" value="${type}">
-        <div class="space-y-4">
-            <div><label class="block text-sm font-medium text-slate-700">Date</label><input type="date" name="date" class="w-full p-2 border rounded mt-1" value="${data.date || today}" required></div>
-            <div><label class="block text-sm font-medium text-slate-700">Vendor</label><select name="vendorId" class="w-full p-2 border rounded mt-1" required ${vendorSelectHtml ? '' : 'disabled'}>${vendorSelectHtml || '<option value="">Add Vendors First</option>'}</select></div>
-            <div><label class="block text-sm font-medium text-slate-700">Product</label><select name="productId" class="w-full p-2 border rounded mt-1" required ${productSelectHtml ? '' : 'disabled'}>${productSelectHtml || '<option value="">Add Products First</option>'}</select></div>
-            <div><label class="block text-sm font-medium text-slate-700">Quantity</label><input type="number" name="quantity" min="1" class="w-full p-2 border rounded mt-1" value="${data.quantity || ''}" required></div>
-        </div>
-        <div class="mt-6 text-right"><button type="submit" class="bg-yellow-600 text-white font-bold py-2 px-6 rounded-lg" ${productSelectHtml && vendorSelectHtml ? '' : 'disabled'}>Log Stock</button></div>
-    `;
-}
+// getInventoryFormHtml removed
 
 function hideModal() {
     const modal = document.getElementById('modal');
@@ -1148,18 +1040,11 @@ function handleFormSubmit(event) {
         case 'editProduct':
             saveProduct(data);
             break;
-        case 'addStockOut':
-        case 'addStockIn':
-            saveInventory(data);
-            break;
+        // Stock cases removed
     }
 
     hideModal();
-    if (appState.currentView === 'inventory' && (appState.editingType === 'addStockOut' || appState.editingType === 'addStockIn')) {
-        updateInventoryView(); 
-    } else {
-        changeView(appState.currentView); 
-    }
+    changeView(appState.currentView); 
     saveAllDataToLocalStorage();
 }
 
@@ -1250,23 +1135,7 @@ function saveProduct(data) {
     populateFilters(); 
 }
 
-
-function saveInventory(data) {
-     const product = productsData.find(p => p.id == data.productId);
-    const vendor = vendorsData.find(v => v.id == data.vendorId);
-    if (!product || !vendor) {
-        console.error("Invalid product or vendor for inventory log:", data);
-        return;
-    }
-    inventoryData.push({
-        id: Date.now(), 
-        type: data.type,
-        date: data.date,
-        vendorId: parseInt(data.vendorId),
-        productId: parseInt(data.productId),
-        quantity: parseInt(data.quantity)
-    });
-}
+// saveInventory removed
 
 function deleteItem(type, id) {
     const confirmDialog = document.getElementById('confirm-dialog');
@@ -1313,9 +1182,8 @@ function downloadData() {
     const allData = {
         salesData,
         vendorsData,
-        productsData,
-        inventoryData
-        // usersData removed as login is removed
+        productsData
+        // inventoryData removed
     };
     const jsonString = JSON.stringify(allData, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
@@ -1353,15 +1221,15 @@ function handleFileUpload(event) {
                 };
                 
                 const proceedWithUpload = () => {
-                    // Basic validation of uploaded data structure (without usersData)
-                    if (uploadedData.salesData && uploadedData.vendorsData && uploadedData.productsData && uploadedData.inventoryData) {
+                    // Basic validation of uploaded data structure (without inventory and users)
+                    if (uploadedData.salesData && uploadedData.vendorsData && uploadedData.productsData ) {
                         salesData = uploadedData.salesData;
                         vendorsData = uploadedData.vendorsData;
                         productsData = uploadedData.productsData;
-                        inventoryData = uploadedData.inventoryData;
+                        // inventoryData removed
                         
                         saveAllDataToLocalStorage();
-                        initializeAppLogic(); // Re-initialize everything with new data
+                        initializeAppLogic(); 
                         alert('Data uploaded and restored successfully!');
                     } else {
                         alert('Error: Invalid data file structure. Please upload a valid backup file.');
