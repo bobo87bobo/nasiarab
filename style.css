@@ -1,0 +1,36 @@
+body { font-family: 'Inter', sans-serif; }
+.chart-container { position: relative; width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; height: 300px; max-height: 400px; }
+#map-container { height: 400px; width: 100%; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+#vendor-modal-map-container { height: 300px; width: 100%; margin-top: 1rem; border-radius: 0.5rem; }
+@media (min-width: 768px) { .chart-container { height: 350px; } #map-container { height: 500px; } }
+.tab-active { border-bottom: 2px solid #ca8a04; color: #ca8a04; font-weight: 600; }
+.tab-inactive { color: #737373; }
+.modal { transition: opacity 0.25s ease; }
+.modal-content { transition: transform 0.25s ease; }
+input:focus, select:focus, textarea:focus { border-color: #ca8a04 !important; outline: 1px solid #ca8a04; }
+.leaflet-control-geocoder-form input { width: 100% !important; }
+.custom-file-input::-webkit-file-upload-button { visibility: hidden; }
+.custom-file-input::before {
+    content: 'Upload Data (JSON)';
+    display: inline-block;
+    background: #4a5568;
+    color: white;
+    border: 1px solid #4a5568;
+    border-radius: 0.375rem;
+    padding: 0.5rem 1rem;
+    outline: none;
+    white-space: nowrap;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.875rem;
+}
+.custom-file-input:hover::before { background: #2d3748; }
+.custom-file-input:active::before { background: #1a202c; }
+#invoice-preview-area { border: 1px solid #e2e8f0; padding: 20px; margin-top: 20px; background-color: white; max-height: 60vh; overflow-y: auto;}
+#invoice-preview-area table { width: 100%; border-collapse: collapse; }
+#invoice-preview-area th, #invoice-preview-area td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 0.875rem; }
+#invoice-preview-area th { background-color: #f1f5f9; }
+#invoice-preview-area .text-right { text-align: right; }
+#invoice-preview-area .font-bold { font-weight: bold; }
